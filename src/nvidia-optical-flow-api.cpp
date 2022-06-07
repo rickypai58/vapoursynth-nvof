@@ -1,4 +1,31 @@
+//==============================================================================
+// Copyright (c) 2022 Aleksey [Mystery Keeper] Lyashin (mystkeeper@gmail.com)
+//
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+//==============================================================================
+
 #include "nvidia-optical-flow-api.h"
+
+#include <cassert>
 
 #ifdef _WIN32
 	const wchar_t NVOF_LIBRARY_NAME[] =
@@ -8,17 +35,15 @@
 		L"nvofapi.dll";
 	#endif
 
-	const char NVCUDA_LIBRARY_NAME[] = "nvcuda.dll";
-
-	#define LOAD_LIBRARY(x) LoadLibraryW(x);
-	#define FREE_LIBRARY(x) FreeLibrary(x);
+	const wchar_t NVCUDA_LIBRARY_NAME[] = L"nvcuda.dll";
 #else
-	#include <dlfcn.h>
+	
 	const char NVOF_LIBRARY_NAME[] = "libnvidia-opticalflow.so.1";
 
-	#define LOAD_LIBRARY(x) dlopen(x, RTLD_LAZY);
-	#define FREE_LIBRARY(x) dlclose(x);
+	
 #endif
+
+using PFNvOFGetMaxSupportedApiVersion = NV_OF_STATUS (NVOFAPI *)(uint32_t *);
 
 //=============================================================================
 
@@ -36,14 +61,44 @@ bool NVidiaOpticalFlowAPI::create(std::string & a_errorString)
 	
 	if(m_referencesNumber > 0)
 	{
+		assert(m_hLibNVOF);
+		assert(m_hLibNVCUDA);
+		assert(m_API.nvCreateOpticalFlowCuda);
 		m_referencesNumber++;
 		return true;
 	}
 
-	m_hLibNVOF = LOAD_LIBRARY(NVOF_LIBRARY_NAME);
+	m_hLibNVOF = loadLibrary(NVOF_LIBRARY_NAME);
 	if(m_hLibNVOF == nullptr)
 	{
 		a_errorString = "Failed to load the NVIDIA Optical Flow library";
+		return false;
+	}
+
+	PFNvOFGetMaxSupportedApiVersion getSupportedApiVersion = (PFNvOFGetMaxSupportedApiVersion)
+		 getFunctionAddress(m_hLibNVOF, "NvOFGetMaxSupportedApiVersion");
+	if(getSupportedApiVersion == nullptr)
+	{
+		a_errorString = "No function \"NvOFGetMaxSupportedApiVersion\" the NVIDIA Optical Flow library";
+		freeLibrary(m_hLibNVOF);
+		return false;
+	}
+
+	uint32_t nvofVersion = 0;
+	NV_OF_STATUS result = getSupportedApiVersion(&nvofVersion);
+	if(result != NV_OF_SUCCESS)
+	{
+		a_errorString = "Failed to get the supported NVOF API version.";
+		freeLibrary(m_hLibNVOF);
+		return false;
+	}
+
+	if(nvofVersion < NV_OF_API_VERSION)
+	{
+		a_errorString = std::string("Supported NVOF API version (") +
+			apiVersionString(nvofVersion) + ") is lower than requested (" +
+			apiVersionString(NV_OF_API_VERSION) + ").";
+		freeLibrary(m_hLibNVOF);
 		return false;
 	}
 
@@ -68,7 +123,7 @@ bool NVidiaOpticalFlowAPI::destroy(std::string & a_errorString)
 	if(m_referencesNumber > 0)
 		return true;
 
-	FREE_LIBRARY(m_hLibNVOF);
+	freeLibrary(m_hLibNVOF);
 
 	return true;
 }
@@ -76,6 +131,17 @@ bool NVidiaOpticalFlowAPI::destroy(std::string & a_errorString)
 const NV_OF_CUDA_API_FUNCTION_LIST * NVidiaOpticalFlowAPI::getAPI()
 {
 	return &m_API;
+}
+
+//=============================================================================
+
+std::string NVidiaOpticalFlowAPI::apiVersionString(uint16_t a_apiVersion)
+{
+	std::string versionString;
+	versionString += std::to_string(a_apiVersion >> 4);
+	versionString += ".";
+	versionString += std::to_string(a_apiVersion & ((1 << 4) - 1));
+	return versionString;
 }
 
 //=============================================================================

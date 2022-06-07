@@ -31,11 +31,49 @@
 
 #ifdef _WIN32
 	#include <Windows.h>
+	using FSChar = wchar_t;
 #else
-	#define HMODULE void *
+	#include <dlfcn.h>
+	using FSChar = char;
+	using HMODULE = void*;
 #endif
 
 #define UNUSED(x) (void)(x)
+
+//==============================================================================
+
+inline HMODULE loadLibrary(const FSChar* a_name)
+{
+#ifdef _WIN32
+	return LoadLibraryW(a_name);
+#else
+	return dlopen(a_name, RTLD_LAZY);
+#endif
+}
+
+//==============================================================================
+
+inline void freeLibrary(HMODULE a_lib)
+{
+#ifdef _WIN32
+	return (void)FreeLibrary(a_lib);
+#else
+	return (void)dlclose(a_lib);
+#endif
+}
+
+//==============================================================================
+
+inline void * getFunctionAddress(HMODULE a_lib, const char* a_functionName)
+{
+#ifdef _WIN32
+	return GetProcAddress(a_lib, a_functionName);
+#else
+	return dlsym(a_lib, a_functionName);
+#endif
+}
+
+//==============================================================================
 
 template<class T, class T2, class T3>
 T clamp(T a_value, T2 a_minBound, T3 a_maxBound)
@@ -46,5 +84,7 @@ T clamp(T a_value, T2 a_minBound, T3 a_maxBound)
 		return a_maxBound;
 	return a_value;
 }
+
+//==============================================================================
 
 #endif
