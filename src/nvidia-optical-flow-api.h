@@ -39,6 +39,7 @@ public:
 	static bool destroy(std::string& a_errorString);
 	static const NV_OF_CUDA_API_FUNCTION_LIST * getAPI();
 	static std::string apiVersionString(uint16_t a_apiVersion);
+	static std::string getErrorDescription(NV_OF_STATUS a_error);
 private:
 	static HMODULE m_hLibNVOF;
 	static HMODULE m_hLibNVCUDA;

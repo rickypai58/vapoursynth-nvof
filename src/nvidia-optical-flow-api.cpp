@@ -26,6 +26,7 @@
 #include "nvidia-optical-flow-api.h"
 
 #include <cassert>
+#include <map>
 
 #ifdef _WIN32
 	const wchar_t NVOF_LIBRARY_NAME[] =
@@ -88,7 +89,8 @@ bool NVidiaOpticalFlowAPI::create(std::string & a_errorString)
 	NV_OF_STATUS result = getSupportedApiVersion(&nvofVersion);
 	if(result != NV_OF_SUCCESS)
 	{
-		a_errorString = "Failed to get the supported NVOF API version.";
+		a_errorString = "Failed to get the supported NVOF API version. " +
+			getErrorDescription(result);
 		freeLibrary(m_hLibNVOF);
 		return false;
 	}
@@ -142,6 +144,32 @@ std::string NVidiaOpticalFlowAPI::apiVersionString(uint16_t a_apiVersion)
 	versionString += ".";
 	versionString += std::to_string(a_apiVersion & ((1 << 4) - 1));
 	return versionString;
+}
+
+//=============================================================================
+
+std::string NVidiaOpticalFlowAPI::getErrorDescription(NV_OF_STATUS a_error)
+{
+	static std::map<NV_OF_STATUS, std::string> descriptions = {
+		{NV_OF_SUCCESS, "Success."},
+		{NV_OF_ERR_OF_NOT_AVAILABLE, "HW Optical flow functionality is not supported."},
+		{NV_OF_ERR_UNSUPPORTED_DEVICE, "Unsupported device."},
+		{NV_OF_ERR_DEVICE_DOES_NOT_EXIST, "Device is no longer available."},
+		{NV_OF_ERR_INVALID_PTR, "Invalid pointer passed to NVOF API."},
+		{NV_OF_ERR_INVALID_PARAM, "Invalid parameter passed to NVOF API."},
+		{NV_OF_ERR_INVALID_CALL, "NVOF API call made in wrong sequence."},
+		{NV_OF_ERR_INVALID_VERSION, "Invalid struct version used."},
+		{NV_OF_ERR_OUT_OF_MEMORY, "Out of memory."},
+		{NV_OF_ERR_NOT_INITIALIZED, "Optical flow session is not initialized."},
+		{NV_OF_ERR_UNSUPPORTED_FEATURE, "Feature not supported."},
+		{NV_OF_ERR_GENERIC, "Unknown internal error."},
+	};
+
+	std::map<NV_OF_STATUS, std::string>::const_iterator it = descriptions.find(a_error);
+	if(it != descriptions.end())
+		return it->second;
+
+	return "Invalid error code.";
 }
 
 //=============================================================================
