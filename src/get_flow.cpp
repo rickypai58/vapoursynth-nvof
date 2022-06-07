@@ -24,6 +24,7 @@
 //==============================================================================
 
 #include "common.h"
+#include "nvidia-optical-flow-api.h"
 
 #include <vector>
 
@@ -57,6 +58,14 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 	VSCore * a_pCore, const VSAPI * a_cpVSAPI)
 {
 	UNUSED(a_pUserData);
+
+	std::string errorString;
+	bool success = NVidiaOpticalFlowAPI::create(errorString);
+	if(!success)
+	{
+		a_cpVSAPI->setError(a_pOut, (std::string("nvof.getFlow: ") + errorString).c_str());
+		return;
+	}
 
 	DataGetFlow internalData;
 
@@ -126,6 +135,9 @@ void VS_CC freeGetFlow(void * a_pInstanceData, VSCore * a_pCore,
 	DataGetFlow * pInternalData = (DataGetFlow *)a_pInstanceData;
 	a_cpVSAPI->freeNode(pInternalData->pInputNode);
 	delete pInternalData;
+
+	std::string errorString;
+	bool success = NVidiaOpticalFlowAPI::destroy(errorString);
 }
 
 //==============================================================================

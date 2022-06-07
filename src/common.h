@@ -29,14 +29,13 @@
 #include <vapoursynth/VapourSynth.h>
 #include <vapoursynth/VSHelper.h>
 
-#define UNUSED(x) (void)(x)
+#ifdef _WIN32
+	#include <Windows.h>
+#else
+	#define HMODULE void *
+#endif
 
-enum SampleTypeSize
-{
-	stzInteger1B = 0,
-	stzInteger2B,
-	stzSingle,
-};
+#define UNUSED(x) (void)(x)
 
 template<class T, class T2, class T3>
 T clamp(T a_value, T2 a_minBound, T3 a_maxBound)

@@ -21,9 +21,13 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\get_flow.cpp" />
     <ClCompile Include="..\..\src\main.cpp" />
+    <ClCompile Include="..\..\src\nvidia-optical-flow-api.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\common.h" />
+    <ClInclude Include="..\..\src\nvidia-optical-flow-api.h" />
+    <ClInclude Include="..\..\src\nvOpticalFlowCommon.h" />
+    <ClInclude Include="..\..\src\nvOpticalFlowCuda.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -79,25 +83,25 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Program Files\VapourSynth\sdk\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(CUDA_PATH)\include;C:\Program Files\VapourSynth\sdk\include;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)..\..\build\msvs\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)..\..\build\msvs\$(Platform)\$(Configuration)\temp\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\Program Files\VapourSynth\sdk\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(CUDA_PATH)\include;C:\Program Files\VapourSynth\sdk\include;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)..\..\build\msvs\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)..\..\build\msvs\$(Platform)\$(Configuration)\temp\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Program Files\VapourSynth\sdk\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(CUDA_PATH)\include;C:\Program Files\VapourSynth\sdk\include;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)..\..\build\msvs\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)..\..\build\msvs\$(Platform)\$(Configuration)\temp\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\Program Files\VapourSynth\sdk\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(CUDA_PATH)\include;C:\Program Files\VapourSynth\sdk\include;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)..\..\build\msvs\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)..\..\build\msvs\$(Platform)\$(Configuration)\temp\</IntDir>
   </PropertyGroup>
