@@ -40,9 +40,9 @@ public:
 	static const NV_OF_CUDA_API_FUNCTION_LIST * getAPI();
 	static std::string apiVersionString(uint16_t a_apiVersion);
 	static std::string getErrorDescription(NV_OF_STATUS a_error);
+	static std::string getErrorDescription(CUresult a_error);
 private:
 	static HMODULE m_hLibNVOF;
-	static HMODULE m_hLibNVCUDA;
 	static NV_OF_CUDA_API_FUNCTION_LIST m_API;
 	static size_t m_referencesNumber;
 	static std::mutex m_lock;

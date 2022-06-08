@@ -35,13 +35,8 @@
 	#else
 		L"nvofapi.dll";
 	#endif
-
-	const wchar_t NVCUDA_LIBRARY_NAME[] = L"nvcuda.dll";
 #else
-	
 	const char NVOF_LIBRARY_NAME[] = "libnvidia-opticalflow.so.1";
-
-	
 #endif
 
 using PFNvOFGetMaxSupportedApiVersion = NV_OF_STATUS (NVOFAPI *)(uint32_t *);
@@ -49,7 +44,6 @@ using PFNvOFGetMaxSupportedApiVersion = NV_OF_STATUS (NVOFAPI *)(uint32_t *);
 //=============================================================================
 
 HMODULE NVidiaOpticalFlowAPI::m_hLibNVOF = nullptr;
-HMODULE NVidiaOpticalFlowAPI::m_hLibNVCUDA = nullptr;
 NV_OF_CUDA_API_FUNCTION_LIST NVidiaOpticalFlowAPI::m_API = { nullptr };
 size_t NVidiaOpticalFlowAPI::m_referencesNumber = 0;
 std::mutex NVidiaOpticalFlowAPI::m_lock;
@@ -86,11 +80,11 @@ bool NVidiaOpticalFlowAPI::create(std::string & a_errorString)
 	}
 
 	uint32_t nvofVersion = 0;
-	NV_OF_STATUS result = getSupportedApiVersion(&nvofVersion);
-	if(result != NV_OF_SUCCESS)
+	NV_OF_STATUS nvResult = getSupportedApiVersion(&nvofVersion);
+	if(nvResult != NV_OF_SUCCESS)
 	{
 		a_errorString = "Failed to get the supported NVOF API version. " +
-			getErrorDescription(result);
+			getErrorDescription(nvResult);
 		freeLibrary(m_hLibNVOF);
 		return false;
 	}
@@ -100,6 +94,14 @@ bool NVidiaOpticalFlowAPI::create(std::string & a_errorString)
 		a_errorString = std::string("Supported NVOF API version (") +
 			apiVersionString(nvofVersion) + ") is lower than requested (" +
 			apiVersionString(NV_OF_API_VERSION) + ").";
+		freeLibrary(m_hLibNVOF);
+		return false;
+	}
+
+	CUresult cuResult = cuInit(0);
+	if(cuResult != CUDA_SUCCESS)
+	{
+		a_errorString = getErrorDescription(cuResult);
 		freeLibrary(m_hLibNVOF);
 		return false;
 	}
@@ -170,6 +172,20 @@ std::string NVidiaOpticalFlowAPI::getErrorDescription(NV_OF_STATUS a_error)
 		return it->second;
 
 	return "Invalid error code.";
+}
+
+//=============================================================================
+
+std::string NVidiaOpticalFlowAPI::getErrorDescription(CUresult a_error)
+{
+	std::string description;
+	const char * pString = nullptr;
+	cuGetErrorName(a_error, &pString);
+	description += pString;
+	description += ": ";
+	cuGetErrorString(a_error, &pString);
+	description += pString;
+	return description;
 }
 
 //=============================================================================
