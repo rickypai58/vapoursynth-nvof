@@ -22,10 +22,12 @@
     <ClCompile Include="..\..\src\get_flow.cpp" />
     <ClCompile Include="..\..\src\main.cpp" />
     <ClCompile Include="..\..\src\nvidia-optical-flow-api.cpp" />
+    <ClCompile Include="..\..\src\nvidia-optical-flow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\common.h" />
     <ClInclude Include="..\..\src\nvidia-optical-flow-api.h" />
+    <ClInclude Include="..\..\src\nvidia-optical-flow.h" />
     <ClInclude Include="..\..\src\nvOpticalFlowCommon.h" />
     <ClInclude Include="..\..\src\nvOpticalFlowCuda.h" />
   </ItemGroup>
