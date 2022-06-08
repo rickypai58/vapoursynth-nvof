@@ -39,6 +39,9 @@ public:
 	bool init(std::string & a_errorString);
 private:
 	void releaseAPI();
+	void destroyContext();
+	bool initNVOF(std::string & a_errorString);
+	void destroyNVOF();
 
 	const VSAPI * m_cpVSAPI{nullptr};
 	uint32_t m_width{0};
