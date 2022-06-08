@@ -87,6 +87,7 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 		a_cpVSAPI->setError(a_pOut, "nvof.getFlow: "
 			"only constant format input with fixed frame number is supported.");
 		a_cpVSAPI->freeNode(internalData.pInputNode);
+		NVidiaOpticalFlowAPI::destroy(errorString);
 		return;
 	}
 
@@ -100,6 +101,7 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 		a_cpVSAPI->setError(a_pOut, "nvof.getFlow: "
 			"failed to initialize the \"delta\" argument.");
 		a_cpVSAPI->freeNode(internalData.pInputNode);
+		NVidiaOpticalFlowAPI::destroy(errorString);
 		return;
 	}
 
@@ -111,6 +113,16 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 	{
 		chromaMotion = 1;
 		error = 0;
+	}
+
+	if(NVidiaOpticalFlow::bufferFormat(internalData.pSourceVideoInfo->format,
+		chromaMotion, errorString) == NV_OF_BUFFER_FORMAT_UNDEFINED)
+	{
+		a_cpVSAPI->setError(a_pOut, (std::string("nvof.getFlow: "
+			"Source format error. ") + errorString).c_str());
+		a_cpVSAPI->freeNode(internalData.pInputNode);
+			NVidiaOpticalFlowAPI::destroy(errorString);
+		return;
 	}
 
 	//--------------------------------------------------------------------------
@@ -141,6 +153,7 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 			"2 - fast, low quality\n"
 			);
 		a_cpVSAPI->freeNode(internalData.pInputNode);
+		NVidiaOpticalFlowAPI::destroy(errorString);
 		return;
 	}
 
@@ -177,6 +190,7 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 		a_cpVSAPI->setError(a_pOut, (std::string("nvof.getFlow: "
 			"failed to initialize the flow calculator. ") + errorString).c_str());
 		a_cpVSAPI->freeNode(internalData.pInputNode);
+		NVidiaOpticalFlowAPI::destroy(errorString);
 		return;
 	}
 

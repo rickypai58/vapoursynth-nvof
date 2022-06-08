@@ -59,6 +59,41 @@ NVidiaOpticalFlow::~NVidiaOpticalFlow()
 
 //==============================================================================
 
+NV_OF_BUFFER_FORMAT NVidiaOpticalFlow::bufferFormat(const VSFormat * a_cpFormat,
+	bool chromaMotion, std::string & a_errorString)
+{
+	const int planes = a_cpFormat->numPlanes;
+	const VSColorFamily family = (VSColorFamily)a_cpFormat->colorFamily;
+	const int ssW = a_cpFormat->subSamplingW;
+	const int ssH = a_cpFormat->subSamplingH;
+
+	if((a_cpFormat->bitsPerSample != 8) || ((planes != 1) && (planes != 3)))
+	{
+		a_errorString = "Only 8 bit per sample formats with 1 or 3 planes "
+			"are supported.";
+		return NV_OF_BUFFER_FORMAT_UNDEFINED;
+	}
+
+	if(planes == 1)
+		return NV_OF_BUFFER_FORMAT_GRAYSCALE8;
+
+	if(((family == cmYUV) || (family == cmYCoCg)) && (!chromaMotion))
+		return NV_OF_BUFFER_FORMAT_GRAYSCALE8;
+
+	if(((family == cmYUV) || (family == cmYCoCg)) && (ssH == 1) && (ssW == 1))
+		return NV_OF_BUFFER_FORMAT_NV12;
+
+	if((ssH != 0) || (ssW != 0))
+	{
+		a_errorString = "Subsampling only supported for YUV420P8 format.";
+		return NV_OF_BUFFER_FORMAT_UNDEFINED;
+	}
+
+	return NV_OF_BUFFER_FORMAT_ABGR8;
+}
+
+//==============================================================================
+
 bool NVidiaOpticalFlow::init(std::string & a_errorString)
 {
 	m_cpVSAPI->logMessage(mtDebug, "NVidiaOpticalFlow: Initializing.");
@@ -140,6 +175,11 @@ void NVidiaOpticalFlow::destroyContext()
 
 bool NVidiaOpticalFlow::initNVOF(std::string & a_errorString)
 {
+	NV_OF_BUFFER_FORMAT sourceBufferFormat = bufferFormat(m_sourceVideoInfo.format,
+		m_chromaMotion, a_errorString);
+	if(sourceBufferFormat == NV_OF_BUFFER_FORMAT_UNDEFINED)
+		return false;
+
 	NV_OF_STATUS result = NVidiaOpticalFlowAPI::getAPI()->nvCreateOpticalFlowCuda(
 		m_context, &m_handle);
 	if(result != NV_OF_SUCCESS)
@@ -165,7 +205,7 @@ bool NVidiaOpticalFlow::initNVOF(std::string & a_errorString)
 		NV_OF_FALSE,
 		NV_OF_PRED_DIRECTION_FORWARD,
 		NV_OF_FALSE,
-		NV_OF_BUFFER_FORMAT_NV12
+		sourceBufferFormat
 	};
 
 	result = NVidiaOpticalFlowAPI::getAPI()->nvOFInit(m_handle, &params);

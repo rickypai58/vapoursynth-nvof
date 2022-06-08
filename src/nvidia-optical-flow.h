@@ -36,6 +36,9 @@ public:
 		int a_gpuID = 0);
 	virtual ~NVidiaOpticalFlow();
 
+	static NV_OF_BUFFER_FORMAT bufferFormat(const VSFormat * a_cpFormat, bool chromaMotion,
+		std::string & a_errorString);
+
 	bool init(std::string & a_errorString);
 private:
 	void releaseAPI();

@@ -26,8 +26,11 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#pragma warning(push)
+#pragma warning( disable : 26812 )
 #include <vapoursynth/VapourSynth.h>
 #include <vapoursynth/VSHelper.h>
+#pragma warning(pop)
 
 #ifdef _WIN32
 	#include <Windows.h>
