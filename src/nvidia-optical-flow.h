@@ -31,16 +31,19 @@
 class NVidiaOpticalFlow
 {
 public:
-	NVidiaOpticalFlow(uint32_t a_width, uint32_t a_height, size_t a_planes = 1,
-		NV_OF_PERF_LEVEL a_perfLevel = NV_OF_PERF_LEVEL_SLOW);
+	NVidiaOpticalFlow(const VSAPI * a_cpVSAPI, uint32_t a_width, uint32_t a_height,
+		size_t a_planes = 1, NV_OF_PERF_LEVEL a_perfLevel = NV_OF_PERF_LEVEL_SLOW,
+		int a_gpuID = 0);
 	virtual ~NVidiaOpticalFlow();
 
-	bool init(std::string & a_error);
+	bool init(std::string & a_errorString);
 private:
+	const VSAPI * m_cpVSAPI{nullptr};
 	uint32_t m_width{0};
 	uint32_t m_height{0};
 	size_t m_planes{1};
 	NV_OF_PERF_LEVEL m_perfLevel{NV_OF_PERF_LEVEL_SLOW};
+	int m_gpuID{0};
 	NvOFHandle m_handle{nullptr};
 	CUcontext m_context{nullptr};
 	bool m_initialized{false};

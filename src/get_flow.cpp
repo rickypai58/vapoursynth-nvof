@@ -24,9 +24,10 @@
 //==============================================================================
 
 #include "common.h"
-#include "nvidia-optical-flow-api.h"
+#include "nvidia-optical-flow.h"
 
 #include <vector>
+#include <memory>
 
 //==============================================================================
 // Filter internal data structure
@@ -37,6 +38,7 @@ struct DataGetFlow
 	const VSVideoInfo * pSourceVideoInfo;
 	VSVideoInfo videoInfo;
 	int64_t delta;
+	std::unique_ptr<NVidiaOpticalFlow> pFlow;
 };
 
 //==============================================================================
@@ -101,12 +103,32 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 	}
 
 	//--------------------------------------------------------------------------
+	// output video info
 
 	internalData.videoInfo = *internalData.pSourceVideoInfo;
 	internalData.videoInfo.width *= 2;
 
+	//--------------------------------------------------------------------------
+	// flow calculator
+
+	internalData.pFlow = std::make_unique<NVidiaOpticalFlow>(
+		a_cpVSAPI,
+		internalData.videoInfo.width,
+		internalData.videoInfo.height,
+		internalData.videoInfo.format->numPlanes);
+
+	if(!internalData.pFlow->init(errorString))
+	{
+		a_cpVSAPI->setError(a_pOut, (std::string("nvof.getFlow: "
+			"failed to initialize the flow calculator. ") + errorString).c_str());
+		a_cpVSAPI->freeNode(internalData.pInputNode);
+		return;
+	}
+
+	//--------------------------------------------------------------------------
+
 	DataGetFlow * pInternalData = new DataGetFlow;
-	*pInternalData = internalData;
+	*pInternalData = std::move(internalData);
 	a_cpVSAPI->createFilter(a_pIn, a_pOut, "getFlow", initGetFlow,
 		getFrameGetFlow, freeGetFlow, fmParallel, 0, pInternalData, a_pCore);
 }

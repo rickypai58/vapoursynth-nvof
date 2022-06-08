@@ -24,33 +24,65 @@
 //==============================================================================
 
 #include "nvidia-optical-flow.h"
+#include <cassert>
 
-NVidiaOpticalFlow::NVidiaOpticalFlow(uint32_t a_width, uint32_t a_height,
-	size_t a_planes, NV_OF_PERF_LEVEL a_perfLevel):
-	  m_width(a_width)
+//==============================================================================
+
+NVidiaOpticalFlow::NVidiaOpticalFlow(const VSAPI * a_cpVSAPI, uint32_t a_width,
+	uint32_t a_height, size_t a_planes, NV_OF_PERF_LEVEL a_perfLevel, int a_gpuID):
+	  m_cpVSAPI(a_cpVSAPI)
+	, m_width(a_width)
 	, m_height(a_height)
 	, m_planes(a_planes)
 	, m_perfLevel(a_perfLevel)
+	, m_gpuID(a_gpuID)
 {
+	assert(m_cpVSAPI);
 }
+
+//==============================================================================
 
 NVidiaOpticalFlow::~NVidiaOpticalFlow()
 {
 	if(!m_initialized)
 		return;
 
-	std::string error;
-	NVidiaOpticalFlowAPI::destroy(error);
+	std::string errorString;
+	if(!NVidiaOpticalFlowAPI::destroy(errorString))
+		m_cpVSAPI->logMessage(mtWarning, (std::string("NVidiaOpticalFlow: "
+		"Failed to release the API. ") + errorString).c_str());
 }
 
-bool NVidiaOpticalFlow::init(std::string & a_error)
+//==============================================================================
+
+bool NVidiaOpticalFlow::init(std::string & a_errorString)
 {
 	if(m_initialized)
 		return true;
 
-	if(!NVidiaOpticalFlowAPI::create(a_error))
+	if((m_planes != 1) && (m_planes != 3))
+	{
+		a_errorString = "Only 1 and 3 planes are supported.";
 		return false;
+	}
+
+	if(!NVidiaOpticalFlowAPI::create(a_errorString))
+		return false;
+
+	CUdevice device;
+	CUresult cuResult = cuDeviceGet(&device, m_gpuID);
+	if(cuResult != CUDA_SUCCESS)
+	{
+		a_errorString = NVidiaOpticalFlowAPI::getErrorDescription(cuResult);
+		std::string destroyError;
+		if(!NVidiaOpticalFlowAPI::destroy(destroyError))
+			m_cpVSAPI->logMessage(mtWarning, (std::string("NVidiaOpticalFlow: "
+				"Failed to release the API. ") + destroyError).c_str());
+		return false;
+	}
 
 	m_initialized = true;
 	return true;
 }
+
+//==============================================================================
