@@ -36,7 +36,7 @@ class NVidiaOpticalFlowAPI
 {
 public:
 	static bool create(std::string & a_errorString);
-	static bool destroy(std::string& a_errorString);
+	static bool destroy(std::string & a_errorString);
 	static const NV_OF_CUDA_API_FUNCTION_LIST * getAPI();
 	static std::string apiVersionString(uint16_t a_apiVersion);
 	static std::string getErrorDescription(NV_OF_STATUS a_error);
@@ -46,6 +46,8 @@ private:
 	static NV_OF_CUDA_API_FUNCTION_LIST m_API;
 	static size_t m_referencesNumber;
 	static std::mutex m_lock;
+
+	static bool initNvofLibrary(std::string & a_errorString);
 };
 
 #endif

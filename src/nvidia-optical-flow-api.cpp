@@ -40,6 +40,8 @@
 #endif
 
 using PFNvOFGetMaxSupportedApiVersion = NV_OF_STATUS (NVOFAPI *)(uint32_t *);
+using PFNvOFAPICreateInstanceCuda = NV_OF_STATUS (NVOFAPI *)(uint32_t,
+	NV_OF_CUDA_API_FUNCTION_LIST *);
 
 //=============================================================================
 
@@ -57,7 +59,6 @@ bool NVidiaOpticalFlowAPI::create(std::string & a_errorString)
 	if(m_referencesNumber > 0)
 	{
 		assert(m_hLibNVOF);
-		assert(m_hLibNVCUDA);
 		assert(m_API.nvCreateOpticalFlowCuda);
 		m_referencesNumber++;
 		return true;
@@ -70,30 +71,8 @@ bool NVidiaOpticalFlowAPI::create(std::string & a_errorString)
 		return false;
 	}
 
-	PFNvOFGetMaxSupportedApiVersion getSupportedApiVersion = (PFNvOFGetMaxSupportedApiVersion)
-		 getFunctionAddress(m_hLibNVOF, "NvOFGetMaxSupportedApiVersion");
-	if(getSupportedApiVersion == nullptr)
+	if(!initNvofLibrary(a_errorString))
 	{
-		a_errorString = "No function \"NvOFGetMaxSupportedApiVersion\" the NVIDIA Optical Flow library";
-		freeLibrary(m_hLibNVOF);
-		return false;
-	}
-
-	uint32_t nvofVersion = 0;
-	NV_OF_STATUS nvResult = getSupportedApiVersion(&nvofVersion);
-	if(nvResult != NV_OF_SUCCESS)
-	{
-		a_errorString = "Failed to get the supported NVOF API version. " +
-			getErrorDescription(nvResult);
-		freeLibrary(m_hLibNVOF);
-		return false;
-	}
-
-	if(nvofVersion < NV_OF_API_VERSION)
-	{
-		a_errorString = std::string("Supported NVOF API version (") +
-			apiVersionString(nvofVersion) + ") is lower than requested (" +
-			apiVersionString(NV_OF_API_VERSION) + ").";
 		freeLibrary(m_hLibNVOF);
 		return false;
 	}
@@ -186,6 +165,58 @@ std::string NVidiaOpticalFlowAPI::getErrorDescription(CUresult a_error)
 	cuGetErrorString(a_error, &pString);
 	description += pString;
 	return description;
+}
+
+//=============================================================================
+
+bool NVidiaOpticalFlowAPI::initNvofLibrary(std::string & a_errorString)
+{
+	PFNvOFGetMaxSupportedApiVersion getSupportedApiVersion = (PFNvOFGetMaxSupportedApiVersion)
+		getFunctionAddress(m_hLibNVOF, "NvOFGetMaxSupportedApiVersion");
+	if(getSupportedApiVersion == nullptr)
+	{
+		a_errorString = "No function \"NvOFGetMaxSupportedApiVersion\" found "
+			"in the NVIDIA Optical Flow library";
+		return false;
+	}
+
+	uint32_t nvofVersion = 0;
+	NV_OF_STATUS nvResult = getSupportedApiVersion(&nvofVersion);
+	if(nvResult != NV_OF_SUCCESS)
+	{
+		a_errorString = "Failed to get the supported NVOF API version. " +
+			getErrorDescription(nvResult);
+		return false;
+	}
+
+	if(nvofVersion < NV_OF_API_VERSION)
+	{
+		a_errorString = std::string("Supported NVOF API version (") +
+			apiVersionString(nvofVersion) + ") is lower than requested (" +
+			apiVersionString(NV_OF_API_VERSION) + ").";
+		return false;
+	}
+
+	PFNvOFAPICreateInstanceCuda createAPI = (PFNvOFAPICreateInstanceCuda)
+		getFunctionAddress(m_hLibNVOF, "NvOFAPICreateInstanceCuda");
+	if(createAPI == nullptr)
+	{
+		a_errorString = "No function \"NvOFAPICreateInstanceCuda\" found "
+			"in the NVIDIA Optical Flow library";
+		return false;
+	}
+
+	nvResult = createAPI(NV_OF_API_VERSION, &m_API);
+	if(nvResult != NV_OF_SUCCESS)
+	{
+		a_errorString = "Failed to initialize NVIDIA Optical Flow API. " +
+			getErrorDescription(nvResult);
+		return false;
+	}
+
+	assert(m_API.nvOFGetCaps);
+
+	return true;
 }
 
 //=============================================================================
