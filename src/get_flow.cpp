@@ -28,17 +28,18 @@
 
 #include <vector>
 #include <memory>
+#include <map>
 
 //==============================================================================
 // Filter internal data structure
 
 struct DataGetFlow
 {
-	VSNodeRef * pInputNode;
-	const VSVideoInfo * pSourceVideoInfo;
-	VSVideoInfo videoInfo;
-	int64_t delta;
-	std::unique_ptr<NVidiaOpticalFlow> pFlow;
+	VSNodeRef * pInputNode{nullptr};
+	const VSVideoInfo * pSourceVideoInfo{nullptr};
+	VSVideoInfo videoInfo{};
+	int64_t delta{0};
+	std::unique_ptr<NVidiaOpticalFlow> pFlow{nullptr};
 };
 
 //==============================================================================
@@ -103,9 +104,57 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 	}
 
 	//--------------------------------------------------------------------------
+	// chromaMotion
+
+	int64_t chromaMotion = a_cpVSAPI->propGetInt(a_pIn, "chromaMotion", 0, &error);
+	if(error != 0)
+	{
+		chromaMotion = 1;
+		error = 0;
+	}
+
+	//--------------------------------------------------------------------------
+	// speed
+
+	int64_t speed = a_cpVSAPI->propGetInt(a_pIn, "speed", 0, &error);
+	if(error != 0)
+	{
+		speed = 0;
+		error = 0;
+	}
+
+	static std::map<int64_t, NV_OF_PERF_LEVEL> perfLevels = {
+		{0, NV_OF_PERF_LEVEL_SLOW},
+		{1, NV_OF_PERF_LEVEL_MEDIUM},
+		{2, NV_OF_PERF_LEVEL_FAST},
+	};
+
+	static std::map<int64_t, NV_OF_PERF_LEVEL>::const_iterator it =
+		perfLevels.find(speed);
+	if(it == perfLevels.end())
+	{
+		a_cpVSAPI->setError(a_pOut, "nvof.getFlow: "
+			"Invalid value for the \"speed\" argument.\n"
+			"Acceptable values:\n"
+			"0 - slow, best quality\n"
+			"1 - medium, medium quality\n"
+			"2 - fast, low quality\n"
+			);
+		a_cpVSAPI->freeNode(internalData.pInputNode);
+		return;
+	}
+
+	NV_OF_PERF_LEVEL perfLevel = it->second;
+
+	//--------------------------------------------------------------------------
 	// gpu
 
-	int gpu = a_cpVSAPI->propGetInt(a_pIn, "gpu", 0, &error);
+	int64_t gpu = a_cpVSAPI->propGetInt(a_pIn, "gpu", 0, &error);
+	if(error != 0)
+	{
+		gpu = 0;
+		error = 0;
+	}
 
 	//--------------------------------------------------------------------------
 	// output video info
@@ -118,11 +167,10 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 
 	internalData.pFlow = std::make_unique<NVidiaOpticalFlow>(
 		a_cpVSAPI,
-		internalData.videoInfo.width,
-		internalData.videoInfo.height,
-		internalData.videoInfo.format->numPlanes,
-		NV_OF_PERF_LEVEL_SLOW,
-		gpu);
+		*internalData.pSourceVideoInfo,
+		(bool)chromaMotion,
+		perfLevel,
+		(int)gpu);
 
 	if(!internalData.pFlow->init(errorString))
 	{
@@ -181,7 +229,7 @@ const VSFrameRef * VS_CC getFrameGetFlow(int a_n, int a_activationReason,
 	int framesNumber = pInternalData->pSourceVideoInfo->numFrames;
 
 	a_n = clamp(a_n, 0, framesNumber - 1);
-	int n2 = clamp(a_n + pInternalData->delta, 0, framesNumber - 1);
+	int n2 = clamp(a_n + (int)pInternalData->delta, 0, framesNumber - 1);
 
 	if(a_activationReason == arInitial)
 	{

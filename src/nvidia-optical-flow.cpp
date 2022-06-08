@@ -28,12 +28,12 @@
 
 //==============================================================================
 
-NVidiaOpticalFlow::NVidiaOpticalFlow(const VSAPI * a_cpVSAPI, uint32_t a_width,
-	uint32_t a_height, size_t a_planes, NV_OF_PERF_LEVEL a_perfLevel, int a_gpuID):
+NVidiaOpticalFlow::NVidiaOpticalFlow(const VSAPI * a_cpVSAPI,
+	const VSVideoInfo & a_sourceVideoInfo, bool a_chromaMotion,
+	NV_OF_PERF_LEVEL a_perfLevel, int a_gpuID):
 	  m_cpVSAPI(a_cpVSAPI)
-	, m_width(a_width)
-	, m_height(a_height)
-	, m_planes(a_planes)
+	, m_sourceVideoInfo(a_sourceVideoInfo)
+	, m_chromaMotion(a_chromaMotion)
 	, m_perfLevel(a_perfLevel)
 	, m_gpuID(a_gpuID)
 {
@@ -68,7 +68,8 @@ bool NVidiaOpticalFlow::init(std::string & a_errorString)
 		return true;
 	}
 
-	if((m_planes != 1) && (m_planes != 3))
+	int planes = m_sourceVideoInfo.format->numPlanes;
+	if((planes != 1) && (planes != 3))
 	{
 		a_errorString = "Only 1 and 3 planes are supported.";
 		return false;
@@ -151,8 +152,8 @@ bool NVidiaOpticalFlow::initNVOF(std::string & a_errorString)
 	assert(m_handle);
 
 	NV_OF_INIT_PARAMS params{
-		m_width,
-		m_height,
+		(uint32_t)m_sourceVideoInfo.width,
+		(uint32_t)m_sourceVideoInfo.height,
 		NV_OF_OUTPUT_VECTOR_GRID_SIZE_1,
 		NV_OF_HINT_VECTOR_GRID_SIZE_UNDEFINED,
 		NV_OF_MODE_OPTICALFLOW,

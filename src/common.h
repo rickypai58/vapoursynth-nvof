@@ -76,7 +76,7 @@ inline void * getFunctionAddress(HMODULE a_lib, const char* a_functionName)
 //==============================================================================
 
 template<class T, class T2, class T3>
-T clamp(T a_value, T2 a_minBound, T3 a_maxBound)
+T clamp(const T & a_value, const T2 & a_minBound, const T3 & a_maxBound)
 {
 	if(a_value < a_minBound)
 		return a_minBound;

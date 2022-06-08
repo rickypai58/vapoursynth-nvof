@@ -27,7 +27,11 @@
 #define NVIDIA_OPTICAL_FLOW_API_H
 
 #include "common.h"
+
+#pragma warning(push)
+#pragma warning( disable : 26812 )
 #include "nvOpticalFlowCuda.h"
+#pragma warning(pop)
 
 #include <string>
 #include <mutex>
