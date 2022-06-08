@@ -40,6 +40,7 @@ VS_EXTERNAL_API(void) VapourSynthPluginInit(VSConfigPlugin a_configFunc,
 	a_registerFunc("getFlow",
 		"clip:clip;"
 		"delta:int:opt;"
+		"gpu:int:opt;"
 		, createGetFlow, nullptr, a_pPlugin);
 }
 

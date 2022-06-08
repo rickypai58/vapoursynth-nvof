@@ -103,6 +103,11 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 	}
 
 	//--------------------------------------------------------------------------
+	// gpu
+
+	int gpu = a_cpVSAPI->propGetInt(a_pIn, "gpu", 0, &error);
+
+	//--------------------------------------------------------------------------
 	// output video info
 
 	internalData.videoInfo = *internalData.pSourceVideoInfo;
@@ -115,7 +120,9 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 		a_cpVSAPI,
 		internalData.videoInfo.width,
 		internalData.videoInfo.height,
-		internalData.videoInfo.format->numPlanes);
+		internalData.videoInfo.format->numPlanes,
+		NV_OF_PERF_LEVEL_SLOW,
+		gpu);
 
 	if(!internalData.pFlow->init(errorString))
 	{

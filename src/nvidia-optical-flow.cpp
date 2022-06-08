@@ -47,10 +47,7 @@ NVidiaOpticalFlow::~NVidiaOpticalFlow()
 	if(!m_initialized)
 		return;
 
-	std::string errorString;
-	if(!NVidiaOpticalFlowAPI::destroy(errorString))
-		m_cpVSAPI->logMessage(mtWarning, (std::string("NVidiaOpticalFlow: "
-		"Failed to release the API. ") + errorString).c_str());
+	releaseAPI();
 }
 
 //==============================================================================
@@ -74,15 +71,22 @@ bool NVidiaOpticalFlow::init(std::string & a_errorString)
 	if(cuResult != CUDA_SUCCESS)
 	{
 		a_errorString = NVidiaOpticalFlowAPI::getErrorDescription(cuResult);
-		std::string destroyError;
-		if(!NVidiaOpticalFlowAPI::destroy(destroyError))
-			m_cpVSAPI->logMessage(mtWarning, (std::string("NVidiaOpticalFlow: "
-				"Failed to release the API. ") + destroyError).c_str());
+		releaseAPI();
 		return false;
 	}
 
 	m_initialized = true;
 	return true;
+}
+
+//==============================================================================
+
+void NVidiaOpticalFlow::releaseAPI()
+{
+	std::string destroyError;
+	if(!NVidiaOpticalFlowAPI::destroy(destroyError))
+		m_cpVSAPI->logMessage(mtWarning, (std::string("NVidiaOpticalFlow: "
+			"Failed to release the API. ") + destroyError).c_str());
 }
 
 //==============================================================================

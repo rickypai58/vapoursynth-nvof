@@ -38,6 +38,8 @@ public:
 
 	bool init(std::string & a_errorString);
 private:
+	void releaseAPI();
+
 	const VSAPI * m_cpVSAPI{nullptr};
 	uint32_t m_width{0};
 	uint32_t m_height{0};
