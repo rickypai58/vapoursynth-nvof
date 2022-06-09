@@ -51,6 +51,7 @@ NVidiaOpticalFlow::~NVidiaOpticalFlow()
 		return;
 	}
 
+	destroyBuffers();
 	destroyNVOF();
 	destroyContext();
 	releaseAPI();
@@ -136,6 +137,13 @@ bool NVidiaOpticalFlow::init(std::string & a_errorString)
 		return false;
 	}
 
+	if(!createBuffers(a_errorString))
+	{
+		destroyNVOF();
+		releaseAPI();
+		return false;
+	}
+
 	m_initialized = true;
 
 	m_cpVSAPI->logMessage(mtDebug, "NVidiaOpticalFlow: Initializing complete.");
@@ -175,9 +183,9 @@ void NVidiaOpticalFlow::destroyContext()
 
 bool NVidiaOpticalFlow::initNVOF(std::string & a_errorString)
 {
-	NV_OF_BUFFER_FORMAT sourceBufferFormat = bufferFormat(m_sourceVideoInfo.format,
+	m_sourceBufferFormat = bufferFormat(m_sourceVideoInfo.format,
 		m_chromaMotion, a_errorString);
-	if(sourceBufferFormat == NV_OF_BUFFER_FORMAT_UNDEFINED)
+	if(m_sourceBufferFormat == NV_OF_BUFFER_FORMAT_UNDEFINED)
 		return false;
 
 	NV_OF_STATUS result = NVidiaOpticalFlowAPI::getAPI()->nvCreateOpticalFlowCuda(
@@ -205,7 +213,7 @@ bool NVidiaOpticalFlow::initNVOF(std::string & a_errorString)
 		NV_OF_FALSE,
 		NV_OF_PRED_DIRECTION_FORWARD,
 		NV_OF_FALSE,
-		sourceBufferFormat
+		m_sourceBufferFormat
 	};
 
 	result = NVidiaOpticalFlowAPI::getAPI()->nvOFInit(m_handle, &params);
@@ -236,6 +244,68 @@ void NVidiaOpticalFlow::destroyNVOF()
 		return;
 	}
 	m_handle = nullptr;
+}
+
+//==============================================================================
+
+bool NVidiaOpticalFlow::createBuffers(std::string & a_errorString)
+{
+	if(!m_handle)
+	{
+		a_errorString = "Failed to create CUDA buffers. "
+			"NVidiaOpticalFlow is not initialized.";
+		return false;
+	}
+
+	NV_OF_BUFFER_DESCRIPTOR descriptor{(uint32_t)m_sourceVideoInfo.width,
+		(uint32_t)m_sourceVideoInfo.height, NV_OF_BUFFER_USAGE_UNDEFINED,
+		NV_OF_BUFFER_FORMAT_UNDEFINED};
+
+	struct BufferInitInfo
+	{
+		NvOFGPUBufferHandle * pHandle{nullptr};
+		NV_OF_BUFFER_USAGE usage{NV_OF_BUFFER_USAGE_UNDEFINED};
+		NV_OF_BUFFER_FORMAT format{NV_OF_BUFFER_FORMAT_UNDEFINED};
+	};
+
+	BufferInitInfo buffersToInit[] = {
+		{&m_hSourceFrame, NV_OF_BUFFER_USAGE_INPUT, m_sourceBufferFormat},
+		{&m_hDeltaFrame, NV_OF_BUFFER_USAGE_INPUT, m_sourceBufferFormat},
+		{&m_hFlow, NV_OF_BUFFER_USAGE_OUTPUT, NV_OF_BUFFER_FORMAT_SHORT2},
+		{&m_hCost, NV_OF_BUFFER_USAGE_INPUT, NV_OF_BUFFER_FORMAT_UINT8},
+	};
+
+	for(const BufferInitInfo & info : buffersToInit)
+	{
+		descriptor.bufferUsage = info.usage;
+		descriptor.bufferFormat = info.format;
+		NV_OF_STATUS result = NVidiaOpticalFlowAPI::getAPI()->nvOFCreateGPUBufferCuda(
+			m_handle, &descriptor, NV_OF_CUDA_BUFFER_TYPE_CUARRAY, info.pHandle);
+		if(result != NV_OF_SUCCESS)
+		{
+			a_errorString = std::string("Failed to create a CUDA buffer. ") +
+				NVidiaOpticalFlowAPI::getErrorDescription(result);
+			destroyBuffers();
+			return false;
+		}
+	}
+
+	return true;
+}
+
+//==============================================================================
+
+void NVidiaOpticalFlow::destroyBuffers()
+{
+	NvOFGPUBufferHandle * buffers[] = {&m_hSourceFrame, &m_hDeltaFrame,
+		&m_hFlow, &m_hCost};
+	for(NvOFGPUBufferHandle * pHandle : buffers)
+	{
+		if(!(*pHandle))
+			continue;
+		NVidiaOpticalFlowAPI::getAPI()->nvOFDestroyGPUBufferCuda(*pHandle);
+		*pHandle = nullptr;
+	}
 }
 
 //==============================================================================

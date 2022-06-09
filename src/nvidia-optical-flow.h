@@ -45,6 +45,8 @@ private:
 	void destroyContext();
 	bool initNVOF(std::string & a_errorString);
 	void destroyNVOF();
+	bool createBuffers(std::string & a_errorString);
+	void destroyBuffers();
 
 	const VSAPI * m_cpVSAPI{nullptr};
 	VSVideoInfo m_sourceVideoInfo{};
@@ -53,6 +55,11 @@ private:
 	int m_gpuID{0};
 	NvOFHandle m_handle{nullptr};
 	CUcontext m_context{nullptr};
+	NV_OF_BUFFER_FORMAT m_sourceBufferFormat{NV_OF_BUFFER_FORMAT_UNDEFINED};
+	NvOFGPUBufferHandle m_hSourceFrame{nullptr};
+	NvOFGPUBufferHandle m_hDeltaFrame{nullptr};
+	NvOFGPUBufferHandle m_hFlow{nullptr};
+	NvOFGPUBufferHandle m_hCost{nullptr};
 	bool m_initialized{false};
 };
 
