@@ -51,6 +51,7 @@ private:
 	bool createBuffers(std::string & a_errorString);
 	void destroyBuffers();
 
+	void loadLumaToBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBufferHandle a_buffer);
 	void loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBufferHandle a_buffer);
 	void downloadFlow(VSFrameRef * a_cpFrame);
 

@@ -57,7 +57,7 @@ NVidiaOpticalFlow::~NVidiaOpticalFlow()
 //==============================================================================
 
 NV_OF_BUFFER_FORMAT NVidiaOpticalFlow::bufferFormat(const VSFormat * a_cpFormat,
-	bool chromaMotion, std::string & a_errorString)
+	bool a_chromaMotion, std::string & a_errorString)
 {
 	const int planes = a_cpFormat->numPlanes;
 	const VSColorFamily family = (VSColorFamily)a_cpFormat->colorFamily;
@@ -74,7 +74,7 @@ NV_OF_BUFFER_FORMAT NVidiaOpticalFlow::bufferFormat(const VSFormat * a_cpFormat,
 	if(planes == 1)
 		return NV_OF_BUFFER_FORMAT_GRAYSCALE8;
 
-	if(((family == cmYUV) || (family == cmYCoCg)) && (!chromaMotion))
+	if(((family == cmYUV) || (family == cmYCoCg)) && (!a_chromaMotion))
 		return NV_OF_BUFFER_FORMAT_GRAYSCALE8;
 
 	if(((family == cmYUV) || (family == cmYCoCg)) && (ssH == 1) && (ssW == 1))
@@ -151,11 +151,19 @@ void NVidiaOpticalFlow::getFlow(const VSFrameRef * a_cpCurrentFrame,
 	if((m_sourceVideoInfo.format != cpCurrentFormat) || (cpCurrentFormat != cpDeltaFormat))
 		return;
 
-	if((cpCurrentFormat->colorFamily == cmYUV) && (cpCurrentFormat->subSamplingW == 1) &&
-		(cpCurrentFormat->subSamplingH == 1))
+	if(m_sourceBufferFormat == NV_OF_BUFFER_FORMAT_NV12)
 	{
 		loadYUV420toBuffer(a_cpCurrentFrame, m_hSourceFrame);
 		loadYUV420toBuffer(a_cpDeltaFrame, m_hDeltaFrame);
+	}
+	else if(m_sourceBufferFormat == NV_OF_BUFFER_FORMAT_GRAYSCALE8)
+	{
+		loadLumaToBuffer(a_cpCurrentFrame, m_hSourceFrame);
+		loadLumaToBuffer(a_cpDeltaFrame, m_hDeltaFrame);
+	}
+	else if(m_sourceBufferFormat == NV_OF_BUFFER_FORMAT_ABGR8)
+	{
+		return;
 	}
 	
 	NV_OF_EXECUTE_INPUT_PARAMS inputParams = {
@@ -235,7 +243,7 @@ bool NVidiaOpticalFlow::initNVOF(std::string & a_errorString)
 		(uint32_t)m_sourceVideoInfo.width,
 		(uint32_t)m_sourceVideoInfo.height,
 		NV_OF_OUTPUT_VECTOR_GRID_SIZE_1,
-		NV_OF_HINT_VECTOR_GRID_SIZE_UNDEFINED,
+		NV_OF_HINT_VECTOR_GRID_SIZE_1,
 		NV_OF_MODE_OPTICALFLOW,
 		m_perfLevel,
 		NV_OF_FALSE,
@@ -334,6 +342,37 @@ void NVidiaOpticalFlow::destroyBuffers()
 		NVidiaOpticalFlowAPI::getAPI()->nvOFDestroyGPUBufferCuda(*pHandle);
 		*pHandle = nullptr;
 	}
+}
+
+//==============================================================================
+
+void NVidiaOpticalFlow::loadLumaToBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBufferHandle a_buffer)
+{
+	const size_t width = m_sourceVideoInfo.width;
+	const size_t height = m_sourceVideoInfo.height;
+	const int srcStride = m_cpVSAPI->getStride(a_cpFrame, 0);
+	const uint8_t * cpSrc = m_cpVSAPI->getReadPtr(a_cpFrame, 0);
+
+	cuCtxPushCurrent(m_context);
+
+	CUdeviceptr devicePtr = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUdeviceptr(a_buffer);
+
+	NV_OF_CUDA_BUFFER_STRIDE_INFO strideInfo{};
+	NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetStrideInfo(a_buffer, &strideInfo);
+
+	CUDA_MEMCPY2D cuCopy2d;
+	memset(&cuCopy2d, 0, sizeof(cuCopy2d));
+	cuCopy2d.WidthInBytes = width;
+	cuCopy2d.srcMemoryType = CU_MEMORYTYPE_HOST;
+	cuCopy2d.srcHost = cpSrc;
+	cuCopy2d.srcPitch = srcStride;
+	cuCopy2d.dstMemoryType = CU_MEMORYTYPE_DEVICE;
+	cuCopy2d.dstDevice = devicePtr;
+	cuCopy2d.dstPitch = strideInfo.strideInfo[0].strideXInBytes;
+	cuCopy2d.Height = height;
+
+	cuMemcpy2D(&cuCopy2d);
+	cuCtxPopCurrent(nullptr);
 }
 
 //==============================================================================
