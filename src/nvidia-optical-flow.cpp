@@ -239,22 +239,21 @@ bool NVidiaOpticalFlow::initNVOF(std::string & a_errorString)
 
 	assert(m_handle);
 
-	NV_OF_INIT_PARAMS params{
-		(uint32_t)m_sourceVideoInfo.width,
-		(uint32_t)m_sourceVideoInfo.height,
-		NV_OF_OUTPUT_VECTOR_GRID_SIZE_1,
-		NV_OF_HINT_VECTOR_GRID_SIZE_1,
-		NV_OF_MODE_OPTICALFLOW,
-		m_perfLevel,
-		NV_OF_FALSE,
-		NV_OF_TRUE,
-		0,
-		NV_OF_STEREO_DISPARITY_RANGE_UNDEFINED,
-		NV_OF_FALSE,
-		NV_OF_PRED_DIRECTION_FORWARD,
-		NV_OF_FALSE,
-		m_sourceBufferFormat
-	};
+	NV_OF_INIT_PARAMS params{};
+	params.width = (uint32_t)m_sourceVideoInfo.width;
+	params.height = (uint32_t)m_sourceVideoInfo.height;
+	params.outGridSize = NV_OF_OUTPUT_VECTOR_GRID_SIZE_1;
+	params.hintGridSize = NV_OF_HINT_VECTOR_GRID_SIZE_UNDEFINED;
+	params.mode = NV_OF_MODE_OPTICALFLOW;
+	params.perfLevel = m_perfLevel;
+	params.enableExternalHints = NV_OF_FALSE;
+	params.enableOutputCost = NV_OF_TRUE;
+	params.hPrivData = 0;
+	params.disparityRange = NV_OF_STEREO_DISPARITY_RANGE_UNDEFINED;
+	params.enableRoi = NV_OF_FALSE;
+	params.predDirection = NV_OF_PRED_DIRECTION_FORWARD;
+	params.enableGlobalFlow = NV_OF_FALSE;
+	params.inputBufferFormat = m_sourceBufferFormat;
 
 	result = NVidiaOpticalFlowAPI::getAPI()->nvOFInit(m_handle, &params);
 	if(result != NV_OF_SUCCESS)
