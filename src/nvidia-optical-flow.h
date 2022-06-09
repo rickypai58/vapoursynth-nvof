@@ -52,6 +52,7 @@ private:
 	void destroyBuffers();
 
 	void loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBufferHandle a_buffer);
+	void downloadFlow(VSFrameRef * a_cpFrame);
 
 	const VSAPI * m_cpVSAPI{nullptr};
 	VSVideoInfo m_sourceVideoInfo{};

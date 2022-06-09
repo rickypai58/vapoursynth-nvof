@@ -199,6 +199,8 @@ void NVidiaOpticalFlow::getFlow(const VSFrameRef * a_cpCurrentFrame,
 		m_cpVSAPI->logMessage(mtCritical, NVidiaOpticalFlowAPI::getErrorDescription(result).c_str());
 		return;
 	}
+
+	downloadFlow(a_pOutFrame);
 }
 
 //==============================================================================
@@ -362,8 +364,6 @@ void NVidiaOpticalFlow::destroyBuffers()
 
 void NVidiaOpticalFlow::loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBufferHandle a_buffer)
 {
-	cuCtxPushCurrent(m_context);
-
 	const size_t width = m_sourceVideoInfo.width;
 	const size_t height = m_sourceVideoInfo.height;
 	const size_t tempBufferYSize = width * height;
@@ -412,9 +412,80 @@ void NVidiaOpticalFlow::loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPU
 	cuCopy2d.dstMemoryType = CU_MEMORYTYPE_ARRAY;
 	cuCopy2d.dstArray = array;
 	cuCopy2d.Height = height + height / 2;
+
+	cuCtxPushCurrent(m_context);
+	cuMemcpy2D(&cuCopy2d);
+	cuCtxPopCurrent(nullptr);
+}
+
+//==============================================================================
+
+void NVidiaOpticalFlow::downloadFlow(VSFrameRef * a_pFrame)
+{
+	const size_t width = m_sourceVideoInfo.width;
+	const size_t height = m_sourceVideoInfo.height;
+
+	size_t flowTempBufferSize = width * height * 2;
+	size_t flowTempBufferStride = width * sizeof(uint16_t) * 2;
+	std::vector<uint16_t> flowTempBuffer(flowTempBufferSize, 0);
+	std::vector<uint8_t> costTempBuffer(width * height, 0);
+
+	CUarray flowArray = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUarray(m_hFlow);
+	CUarray costArray = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUarray(m_hCost);
+
+	CUDA_MEMCPY2D cuCopy2d;
+	memset(&cuCopy2d, 0, sizeof(cuCopy2d));
+	cuCopy2d.WidthInBytes = flowTempBufferStride;
+	cuCopy2d.dstMemoryType = CU_MEMORYTYPE_HOST;
+	cuCopy2d.dstHost = flowTempBuffer.data();
+	cuCopy2d.dstPitch = flowTempBufferStride;
+	cuCopy2d.srcMemoryType = CU_MEMORYTYPE_ARRAY;
+	cuCopy2d.srcArray = flowArray;
+	cuCopy2d.Height = height;
+
+	cuCtxPushCurrent(m_context);
+
+	cuMemcpy2D(&cuCopy2d);
+
+	cuCopy2d.WidthInBytes = width;
+	cuCopy2d.dstHost = costTempBuffer.data();
+	cuCopy2d.dstPitch = width;
+	cuCopy2d.srcArray = costArray;
+
 	cuMemcpy2D(&cuCopy2d);
 
 	cuCtxPopCurrent(nullptr);
+
+	const int yStride = m_cpVSAPI->getStride(a_pFrame, 0);
+	uint8_t * pDestRow = m_cpVSAPI->getWritePtr(a_pFrame, 0);
+	const uint8_t * pSrcRow = costTempBuffer.data();
+	for(size_t h = 0; h < height; ++h)
+	{
+		for(size_t w = 0; w < width; ++w)
+			pDestRow[w << 1] = pSrcRow[w];
+		pDestRow += yStride;
+		pSrcRow += width;
+	}
+
+	const int uStride = m_cpVSAPI->getStride(a_pFrame, 1);
+	const int vStride = m_cpVSAPI->getStride(a_pFrame, 2);
+	uint8_t * pDestURow = m_cpVSAPI->getWritePtr(a_pFrame, 1);
+	uint8_t * pDestVRow = m_cpVSAPI->getWritePtr(a_pFrame, 2);
+	const size_t flowStrideInElements = width * 2;
+	const uint16_t * cpSrcRow = flowTempBuffer.data();
+	for(size_t h = 0; h < height; ++h)
+	{
+		uint16_t * pURow16 = (uint16_t *)pDestURow;
+		uint16_t * pVRow16 = (uint16_t *)pDestVRow;
+		for(size_t w = 0; w < width; ++w)
+		{
+			pURow16[w] = cpSrcRow[w << 1];
+			pVRow16[w] = cpSrcRow[(w << 1) | 1];
+		}
+		pDestURow += uStride;
+		pDestVRow += vStride;
+		cpSrcRow += flowStrideInElements;
+	}
 }
 
 //==============================================================================
