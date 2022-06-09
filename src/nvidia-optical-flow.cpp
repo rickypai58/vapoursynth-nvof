@@ -324,7 +324,7 @@ bool NVidiaOpticalFlow::createBuffers(std::string & a_errorString)
 		{&m_hSourceFrame, NV_OF_BUFFER_USAGE_INPUT, m_sourceBufferFormat},
 		{&m_hDeltaFrame, NV_OF_BUFFER_USAGE_INPUT, m_sourceBufferFormat},
 		{&m_hFlow, NV_OF_BUFFER_USAGE_OUTPUT, NV_OF_BUFFER_FORMAT_SHORT2},
-		{&m_hCost, NV_OF_BUFFER_USAGE_INPUT, NV_OF_BUFFER_FORMAT_UINT8},
+		{&m_hCost, NV_OF_BUFFER_USAGE_COST, NV_OF_BUFFER_FORMAT_UINT8},
 	};
 
 	for(const BufferInitInfo & info : buffersToInit)
