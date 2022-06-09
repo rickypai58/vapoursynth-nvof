@@ -166,26 +166,24 @@ void NVidiaOpticalFlow::getFlow(const VSFrameRef * a_cpCurrentFrame,
 		return;
 	}
 	
-	NV_OF_EXECUTE_INPUT_PARAMS inputParams = {
-		m_hSourceFrame,
-		m_hDeltaFrame,
-		nullptr,
-		NV_OF_TRUE,
-		0,
-		nullptr,
-		0,
-		0,
-		nullptr
-	};
+	NV_OF_EXECUTE_INPUT_PARAMS inputParams{0};
+	inputParams.inputFrame = m_hSourceFrame;
+	inputParams.referenceFrame = m_hDeltaFrame;
+	inputParams.externalHints = nullptr;
+	inputParams.disableTemporalHints = NV_OF_TRUE;
+	inputParams.padding = 0;
+	inputParams.hPrivData = nullptr;
+	inputParams.padding2 = 0;
+	inputParams.numRois = 0;
+	inputParams.roiData = nullptr;
 
-	NV_OF_EXECUTE_OUTPUT_PARAMS outputParams = {
-		m_hFlow,
-		m_hCost,
-		nullptr,
-		nullptr,
-		nullptr,
-		nullptr
-	};
+	NV_OF_EXECUTE_OUTPUT_PARAMS outputParams{0};
+	outputParams.outputBuffer = m_hFlow;
+	outputParams.outputCostBuffer = m_hCost;
+	outputParams.hPrivData = nullptr;
+	outputParams.bwdOutputBuffer = nullptr;
+	outputParams.bwdOutputCostBuffer = nullptr;
+	outputParams.globalFlowBuffer = nullptr;
 
 	cuCtxPushCurrent(m_context);
 	NV_OF_STATUS result = NVidiaOpticalFlowAPI::getAPI()->nvOFExecute(m_handle,
@@ -239,7 +237,7 @@ bool NVidiaOpticalFlow::initNVOF(std::string & a_errorString)
 
 	assert(m_handle);
 
-	NV_OF_INIT_PARAMS params{};
+	NV_OF_INIT_PARAMS params{0};
 	params.width = (uint32_t)m_sourceVideoInfo.width;
 	params.height = (uint32_t)m_sourceVideoInfo.height;
 	params.outGridSize = NV_OF_OUTPUT_VECTOR_GRID_SIZE_1;
@@ -292,9 +290,11 @@ bool NVidiaOpticalFlow::createBuffers(std::string & a_errorString)
 		return false;
 	}
 
-	NV_OF_BUFFER_DESCRIPTOR descriptor{(uint32_t)m_sourceVideoInfo.width,
-		(uint32_t)m_sourceVideoInfo.height, NV_OF_BUFFER_USAGE_UNDEFINED,
-		NV_OF_BUFFER_FORMAT_UNDEFINED};
+	NV_OF_BUFFER_DESCRIPTOR descriptor{0};
+	descriptor.width = (uint32_t)m_sourceVideoInfo.width;
+	descriptor.height = (uint32_t)m_sourceVideoInfo.height;
+	descriptor.bufferUsage = NV_OF_BUFFER_USAGE_UNDEFINED;
+	descriptor.bufferFormat = NV_OF_BUFFER_FORMAT_UNDEFINED;
 
 	struct BufferInitInfo
 	{
@@ -359,8 +359,7 @@ void NVidiaOpticalFlow::loadLumaToBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBu
 	NV_OF_CUDA_BUFFER_STRIDE_INFO strideInfo{};
 	NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetStrideInfo(a_buffer, &strideInfo);
 
-	CUDA_MEMCPY2D cuCopy2d;
-	memset(&cuCopy2d, 0, sizeof(cuCopy2d));
+	CUDA_MEMCPY2D cuCopy2d{0};
 	cuCopy2d.WidthInBytes = width;
 	cuCopy2d.srcMemoryType = CU_MEMORYTYPE_HOST;
 	cuCopy2d.srcHost = cpSrc;
@@ -422,8 +421,7 @@ void NVidiaOpticalFlow::loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPU
 	NV_OF_CUDA_BUFFER_STRIDE_INFO strideInfo{};
 	NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetStrideInfo(a_buffer, &strideInfo);
 
-	CUDA_MEMCPY2D cuCopy2d;
-	memset(&cuCopy2d, 0, sizeof(cuCopy2d));
+	CUDA_MEMCPY2D cuCopy2d{0};
 	cuCopy2d.WidthInBytes = width;
 	cuCopy2d.srcMemoryType = CU_MEMORYTYPE_HOST;
 	cuCopy2d.srcHost = tempBuffer.data();
@@ -457,8 +455,7 @@ void NVidiaOpticalFlow::downloadFlow(VSFrameRef * a_pFrame)
 	NV_OF_CUDA_BUFFER_STRIDE_INFO strideInfo{};
 	NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetStrideInfo(m_hFlow, &strideInfo);
 
-	CUDA_MEMCPY2D cuCopy2d;
-	memset(&cuCopy2d, 0, sizeof(cuCopy2d));
+	CUDA_MEMCPY2D cuCopy2d{0};
 	cuCopy2d.WidthInBytes = flowTempBufferStride;
 	cuCopy2d.dstMemoryType = CU_MEMORYTYPE_HOST;
 	cuCopy2d.dstHost = flowTempBuffer.data();
