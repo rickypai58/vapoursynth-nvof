@@ -45,18 +45,13 @@ NVidiaOpticalFlow::NVidiaOpticalFlow(const VSAPI * a_cpVSAPI,
 
 NVidiaOpticalFlow::~NVidiaOpticalFlow()
 {
-	m_cpVSAPI->logMessage(mtDebug, "NVidiaOpticalFlow: Cleaning up.");
 	if(!m_initialized)
-	{
-		m_cpVSAPI->logMessage(mtDebug, "NVidiaOpticalFlow: Nothing to clean up.");
 		return;
-	}
 
 	destroyBuffers();
 	destroyNVOF();
 	destroyContext();
 	releaseAPI();
-	m_cpVSAPI->logMessage(mtDebug, "NVidiaOpticalFlow: Cleaning up finished.");
 }
 
 //==============================================================================
@@ -98,12 +93,8 @@ NV_OF_BUFFER_FORMAT NVidiaOpticalFlow::bufferFormat(const VSFormat * a_cpFormat,
 
 bool NVidiaOpticalFlow::init(std::string & a_errorString)
 {
-	m_cpVSAPI->logMessage(mtDebug, "NVidiaOpticalFlow: Initializing.");
 	if(m_initialized)
-	{
-		m_cpVSAPI->logMessage(mtDebug, "NVidiaOpticalFlow: Already initialized.");
 		return true;
-	}
 
 	int planes = m_sourceVideoInfo.format->numPlanes;
 	if((planes != 1) && (planes != 3))
@@ -146,8 +137,6 @@ bool NVidiaOpticalFlow::init(std::string & a_errorString)
 	}
 
 	m_initialized = true;
-
-	m_cpVSAPI->logMessage(mtDebug, "NVidiaOpticalFlow: Initializing complete.");
 
 	return true;
 }
@@ -195,10 +184,7 @@ void NVidiaOpticalFlow::getFlow(const VSFrameRef * a_cpCurrentFrame,
 		&inputParams, &outputParams);
 	cuCtxPopCurrent(nullptr);
 	if(result != NV_OF_SUCCESS)
-	{
-		m_cpVSAPI->logMessage(mtCritical, NVidiaOpticalFlowAPI::getErrorDescription(result).c_str());
 		return;
-	}
 
 	downloadFlow(a_pOutFrame);
 }
@@ -208,9 +194,7 @@ void NVidiaOpticalFlow::getFlow(const VSFrameRef * a_cpCurrentFrame,
 void NVidiaOpticalFlow::releaseAPI()
 {
 	std::string destroyError;
-	if(!NVidiaOpticalFlowAPI::destroy(destroyError))
-		m_cpVSAPI->logMessage(mtWarning, (std::string("NVidiaOpticalFlow: "
-			"Failed to release the API. ") + destroyError).c_str());
+	NVidiaOpticalFlowAPI::destroy(destroyError);
 }
 
 //==============================================================================
@@ -222,12 +206,8 @@ void NVidiaOpticalFlow::destroyContext()
 
 	CUresult cuResult = cuCtxDestroy(m_context);
 	if(cuResult != CUDA_SUCCESS)
-	{
-		m_cpVSAPI->logMessage(mtWarning, (std::string("NVidiaOpticalFlow: "
-			"Failed to destroy CUDA context. ") +
-			NVidiaOpticalFlowAPI::getErrorDescription(cuResult)).c_str());
 		return;
-	}
+
 	m_context = nullptr;
 }
 
@@ -289,12 +269,8 @@ void NVidiaOpticalFlow::destroyNVOF()
 
 	NV_OF_STATUS result = NVidiaOpticalFlowAPI::getAPI()->nvOFDestroy(m_handle);
 	if(result != NV_OF_SUCCESS)
-	{
-		m_cpVSAPI->logMessage(mtWarning, (std::string("NVidiaOpticalFlow: "
-			"Failed to destroy CUDA flow. ") +
-			NVidiaOpticalFlowAPI::getErrorDescription(result)).c_str());
 		return;
-	}
+
 	m_handle = nullptr;
 }
 
