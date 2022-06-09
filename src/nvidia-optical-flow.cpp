@@ -332,7 +332,7 @@ bool NVidiaOpticalFlow::createBuffers(std::string & a_errorString)
 		descriptor.bufferUsage = info.usage;
 		descriptor.bufferFormat = info.format;
 		NV_OF_STATUS result = NVidiaOpticalFlowAPI::getAPI()->nvOFCreateGPUBufferCuda(
-			m_handle, &descriptor, NV_OF_CUDA_BUFFER_TYPE_CUARRAY, info.pHandle);
+			m_handle, &descriptor, NV_OF_CUDA_BUFFER_TYPE_CUDEVICEPTR, info.pHandle);
 		if(result != NV_OF_SUCCESS)
 		{
 			a_errorString = std::string("Failed to create a CUDA buffer. ") +
@@ -401,7 +401,12 @@ void NVidiaOpticalFlow::loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPU
 		cpVRow += vStride;
 	}
 
-	CUarray array = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUarray(a_buffer);
+	cuCtxPushCurrent(m_context);
+
+	CUdeviceptr devicePtr = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUdeviceptr(a_buffer);
+
+	NV_OF_CUDA_BUFFER_STRIDE_INFO strideInfo{};
+	NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetStrideInfo(a_buffer, &strideInfo);
 
 	CUDA_MEMCPY2D cuCopy2d;
 	memset(&cuCopy2d, 0, sizeof(cuCopy2d));
@@ -409,11 +414,11 @@ void NVidiaOpticalFlow::loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPU
 	cuCopy2d.srcMemoryType = CU_MEMORYTYPE_HOST;
 	cuCopy2d.srcHost = tempBuffer.data();
 	cuCopy2d.srcPitch = width;
-	cuCopy2d.dstMemoryType = CU_MEMORYTYPE_ARRAY;
-	cuCopy2d.dstArray = array;
+	cuCopy2d.dstMemoryType = CU_MEMORYTYPE_DEVICE;
+	cuCopy2d.dstDevice = devicePtr;
+	cuCopy2d.dstPitch = strideInfo.strideInfo[0].strideXInBytes;
 	cuCopy2d.Height = height + height / 2;
 
-	cuCtxPushCurrent(m_context);
 	cuMemcpy2D(&cuCopy2d);
 	cuCtxPopCurrent(nullptr);
 }
@@ -422,6 +427,8 @@ void NVidiaOpticalFlow::loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPU
 
 void NVidiaOpticalFlow::downloadFlow(VSFrameRef * a_pFrame)
 {
+	cuCtxPushCurrent(m_context);
+
 	const size_t width = m_sourceVideoInfo.width;
 	const size_t height = m_sourceVideoInfo.height;
 
@@ -430,8 +437,11 @@ void NVidiaOpticalFlow::downloadFlow(VSFrameRef * a_pFrame)
 	std::vector<uint16_t> flowTempBuffer(flowTempBufferSize, 0);
 	std::vector<uint8_t> costTempBuffer(width * height, 0);
 
-	CUarray flowArray = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUarray(m_hFlow);
-	CUarray costArray = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUarray(m_hCost);
+	CUdeviceptr flowDevicePtr = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUdeviceptr(m_hFlow);
+	CUdeviceptr costDevicePtr = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUdeviceptr(m_hCost);
+
+	NV_OF_CUDA_BUFFER_STRIDE_INFO strideInfo{};
+	NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetStrideInfo(m_hFlow, &strideInfo);
 
 	CUDA_MEMCPY2D cuCopy2d;
 	memset(&cuCopy2d, 0, sizeof(cuCopy2d));
@@ -439,18 +449,20 @@ void NVidiaOpticalFlow::downloadFlow(VSFrameRef * a_pFrame)
 	cuCopy2d.dstMemoryType = CU_MEMORYTYPE_HOST;
 	cuCopy2d.dstHost = flowTempBuffer.data();
 	cuCopy2d.dstPitch = flowTempBufferStride;
-	cuCopy2d.srcMemoryType = CU_MEMORYTYPE_ARRAY;
-	cuCopy2d.srcArray = flowArray;
+	cuCopy2d.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+	cuCopy2d.srcDevice = flowDevicePtr;
+	cuCopy2d.srcPitch = strideInfo.strideInfo[0].strideXInBytes;
 	cuCopy2d.Height = height;
 
-	cuCtxPushCurrent(m_context);
+	NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetStrideInfo(m_hCost, &strideInfo);
 
 	cuMemcpy2D(&cuCopy2d);
 
 	cuCopy2d.WidthInBytes = width;
 	cuCopy2d.dstHost = costTempBuffer.data();
 	cuCopy2d.dstPitch = width;
-	cuCopy2d.srcArray = costArray;
+	cuCopy2d.srcDevice = costDevicePtr;
+	cuCopy2d.srcPitch = strideInfo.strideInfo[0].strideXInBytes;
 
 	cuMemcpy2D(&cuCopy2d);
 
