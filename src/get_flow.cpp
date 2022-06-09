@@ -27,7 +27,6 @@
 #include "nvidia-optical-flow.h"
 
 #include <vector>
-#include <memory>
 #include <map>
 
 //==============================================================================
@@ -38,8 +37,10 @@ struct DataGetFlow
 	VSNodeRef * pInputNode{nullptr};
 	const VSVideoInfo * pSourceVideoInfo{nullptr};
 	VSVideoInfo videoInfo{};
-	int64_t delta{0};
-	std::unique_ptr<NVidiaOpticalFlow> pFlow{nullptr};
+	int64_t delta{1};
+	int64_t chromaMotion{1};
+	NV_OF_PERF_LEVEL perfLevel{NV_OF_PERF_LEVEL_UNDEFINED};
+	int64_t gpu{0};
 };
 
 //==============================================================================
@@ -108,15 +109,15 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 	//--------------------------------------------------------------------------
 	// chromaMotion
 
-	int64_t chromaMotion = a_cpVSAPI->propGetInt(a_pIn, "chromaMotion", 0, &error);
+	internalData.chromaMotion = a_cpVSAPI->propGetInt(a_pIn, "chromaMotion", 0, &error);
 	if(error != 0)
 	{
-		chromaMotion = 1;
+		internalData.chromaMotion = 1;
 		error = 0;
 	}
 
 	if(NVidiaOpticalFlow::bufferFormat(internalData.pSourceVideoInfo->format,
-		chromaMotion, errorString) == NV_OF_BUFFER_FORMAT_UNDEFINED)
+		internalData.chromaMotion, errorString) == NV_OF_BUFFER_FORMAT_UNDEFINED)
 	{
 		a_cpVSAPI->setError(a_pOut, (std::string("nvof.getFlow: "
 			"Source format error. ") + errorString).c_str());
@@ -157,15 +158,15 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 		return;
 	}
 
-	NV_OF_PERF_LEVEL perfLevel = it->second;
+	internalData.perfLevel = it->second;
 
 	//--------------------------------------------------------------------------
 	// gpu
 
-	int64_t gpu = a_cpVSAPI->propGetInt(a_pIn, "gpu", 0, &error);
+	internalData.gpu = a_cpVSAPI->propGetInt(a_pIn, "gpu", 0, &error);
 	if(error != 0)
 	{
-		gpu = 0;
+		internalData.gpu = 0;
 		error = 0;
 	}
 
@@ -173,26 +174,8 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 	// output video info
 
 	internalData.videoInfo = *internalData.pSourceVideoInfo;
-	internalData.videoInfo.width *= 2;
-
-	//--------------------------------------------------------------------------
-	// flow calculator
-
-	internalData.pFlow = std::make_unique<NVidiaOpticalFlow>(
-		a_cpVSAPI,
-		*internalData.pSourceVideoInfo,
-		(bool)chromaMotion,
-		perfLevel,
-		(int)gpu);
-
-	if(!internalData.pFlow->init(errorString))
-	{
-		a_cpVSAPI->setError(a_pOut, (std::string("nvof.getFlow: "
-			"failed to initialize the flow calculator. ") + errorString).c_str());
-		a_cpVSAPI->freeNode(internalData.pInputNode);
-		NVidiaOpticalFlowAPI::destroy(errorString);
-		return;
-	}
+	internalData.videoInfo.format = a_cpVSAPI->registerFormat(
+		cmYUV, stInteger, 16, 0, 0, a_pCore);
 
 	//--------------------------------------------------------------------------
 
@@ -249,55 +232,48 @@ const VSFrameRef * VS_CC getFrameGetFlow(int a_n, int a_activationReason,
 	{
 		a_cpVSAPI->requestFrameFilter(a_n, pInternalData->pInputNode, a_pFrameCtx);
 		a_cpVSAPI->requestFrameFilter(n2, pInternalData->pInputNode, a_pFrameCtx);
+		return nullptr;
 	}
-	else if(a_activationReason == arAllFramesReady)
+	else if(a_activationReason != arAllFramesReady)
+		return nullptr;
+
+	const VSFormat * cpSourceFormat = pInternalData->pSourceVideoInfo->format;
+	const VSFormat * cpFormat = pInternalData->videoInfo.format;
+
+	const VSFrameRef * cpCurrentFrame = a_cpVSAPI->getFrameFilter(a_n,
+		pInternalData->pInputNode, a_pFrameCtx);
+	const VSFrameRef * cpDeltaFrame = a_cpVSAPI->getFrameFilter(n2,
+		pInternalData->pInputNode, a_pFrameCtx);
+
+	VSFrameRef * pOutFrame = a_cpVSAPI->newVideoFrame(cpFormat,
+		pInternalData->videoInfo.width, pInternalData->videoInfo.height,
+		cpCurrentFrame, a_pCore);
+
+	std::string errorString;
+
+	NVidiaOpticalFlow flow(a_cpVSAPI,
+		*pInternalData->pSourceVideoInfo,
+		(bool)pInternalData->chromaMotion,
+		pInternalData->perfLevel,
+		(int)pInternalData->gpu);
+
+	if(!flow.init(errorString))
 	{
-		const VSFormat * cpSourceFormat = pInternalData->pSourceVideoInfo->format;
-		const VSFormat * cpFormat = pInternalData->videoInfo.format;
-
-		const VSFrameRef * cpCurrentFrame = a_cpVSAPI->getFrameFilter(a_n,
-			pInternalData->pInputNode, a_pFrameCtx);
-		const VSFrameRef * cpDeltaFrame = a_cpVSAPI->getFrameFilter(n2,
-			pInternalData->pInputNode, a_pFrameCtx);
-
-		std::vector<const VSFrameRef *> planeSources(cpSourceFormat->numPlanes, nullptr);
-		std::vector<int> planes(cpSourceFormat->numPlanes, 0);
-
-		VSFrameRef * pOutFrame = a_cpVSAPI->newVideoFrame2(cpFormat,
-			pInternalData->videoInfo.width, pInternalData->videoInfo.height,
-			planeSources.data(), planes.data(), cpCurrentFrame, a_pCore);
-
-		const size_t sampleSize = cpFormat->bytesPerSample;
-		
-		for(int plane = 0; plane < cpSourceFormat->numPlanes; ++plane)
-		{
-			size_t sourceStride = a_cpVSAPI->getStride(cpCurrentFrame, plane);
-			size_t sourceWidth = a_cpVSAPI->getFrameWidth(cpCurrentFrame, plane);
-			size_t sourceRowSize = sampleSize * sourceWidth;
-			size_t height = a_cpVSAPI->getFrameHeight(cpCurrentFrame, plane);
-			size_t outStride = a_cpVSAPI->getStride(pOutFrame, plane);
-
-			const uint8_t * cpCurrentRow = a_cpVSAPI->getReadPtr(cpCurrentFrame, plane);
-			const uint8_t * cpDeltaRow = a_cpVSAPI->getReadPtr(cpDeltaFrame, plane);
-			uint8_t * pOutRow = a_cpVSAPI->getWritePtr(pOutFrame, plane);
-
-			for(size_t h = 0; h < height; ++h)
-			{
-				memcpy(pOutRow, cpCurrentRow, sourceRowSize);
-				memcpy(pOutRow + sourceRowSize, cpDeltaRow, sourceRowSize);
-				cpCurrentRow += sourceStride;
-				cpDeltaRow += sourceStride;
-				pOutRow += outStride;
-			}
-		}
-
+		a_cpVSAPI->setFilterError((std::string("nvof.getFlow: "
+			"failed to initialize the flow calculator. ") +
+			errorString).c_str(), a_pFrameCtx);
 		a_cpVSAPI->freeFrame(cpCurrentFrame);
 		a_cpVSAPI->freeFrame(cpDeltaFrame);
-
-		return pOutFrame;
+		a_cpVSAPI->freeFrame(pOutFrame);
+		return nullptr;
 	}
 
-	return nullptr;
+	flow.getFlow(cpCurrentFrame, cpDeltaFrame, pOutFrame);
+
+	a_cpVSAPI->freeFrame(cpCurrentFrame);
+	a_cpVSAPI->freeFrame(cpDeltaFrame);
+
+	return pOutFrame;
 }
 
 //==============================================================================

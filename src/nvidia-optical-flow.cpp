@@ -25,6 +25,7 @@
 
 #include "nvidia-optical-flow.h"
 #include <cassert>
+#include <vector>
 
 //==============================================================================
 
@@ -149,6 +150,55 @@ bool NVidiaOpticalFlow::init(std::string & a_errorString)
 	m_cpVSAPI->logMessage(mtDebug, "NVidiaOpticalFlow: Initializing complete.");
 
 	return true;
+}
+
+//==============================================================================
+
+void NVidiaOpticalFlow::getFlow(const VSFrameRef * a_cpCurrentFrame,
+	const VSFrameRef * a_cpDeltaFrame, VSFrameRef * a_pOutFrame)
+{
+	const VSFormat * cpCurrentFormat = m_cpVSAPI->getFrameFormat(a_cpCurrentFrame);
+	const VSFormat * cpDeltaFormat = m_cpVSAPI->getFrameFormat(a_cpDeltaFrame);
+	if((m_sourceVideoInfo.format != cpCurrentFormat) || (cpCurrentFormat != cpDeltaFormat))
+		return;
+
+	if((cpCurrentFormat->colorFamily == cmYUV) && (cpCurrentFormat->subSamplingW == 1) &&
+		(cpCurrentFormat->subSamplingH == 1))
+	{
+		loadYUV420toBuffer(a_cpCurrentFrame, m_hSourceFrame);
+		loadYUV420toBuffer(a_cpDeltaFrame, m_hDeltaFrame);
+	}
+	
+	NV_OF_EXECUTE_INPUT_PARAMS inputParams = {
+		m_hSourceFrame,
+		m_hDeltaFrame,
+		nullptr,
+		NV_OF_FALSE,
+		0,
+		nullptr,
+		0,
+		0,
+		nullptr
+	};
+
+	NV_OF_EXECUTE_OUTPUT_PARAMS outputParams = {
+		m_hFlow,
+		m_hCost,
+		nullptr,
+		nullptr,
+		nullptr,
+		nullptr
+	};
+
+	cuCtxPushCurrent(m_context);
+	NV_OF_STATUS result = NVidiaOpticalFlowAPI::getAPI()->nvOFExecute(m_handle,
+		&inputParams, &outputParams);
+	cuCtxPopCurrent(nullptr);
+	if(result != NV_OF_SUCCESS)
+	{
+		m_cpVSAPI->logMessage(mtCritical, NVidiaOpticalFlowAPI::getErrorDescription(result).c_str());
+		return;
+	}
 }
 
 //==============================================================================
@@ -306,6 +356,65 @@ void NVidiaOpticalFlow::destroyBuffers()
 		NVidiaOpticalFlowAPI::getAPI()->nvOFDestroyGPUBufferCuda(*pHandle);
 		*pHandle = nullptr;
 	}
+}
+
+//==============================================================================
+
+void NVidiaOpticalFlow::loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBufferHandle a_buffer)
+{
+	cuCtxPushCurrent(m_context);
+
+	const size_t width = m_sourceVideoInfo.width;
+	const size_t height = m_sourceVideoInfo.height;
+	const size_t tempBufferYSize = width * height;
+	const size_t tempBufferUVSize = width * height / 2;
+	const size_t tempBufferSize = tempBufferYSize + tempBufferUVSize;
+
+	std::vector<uint8_t> tempBuffer(tempBufferSize, 0);
+
+	const int yStride = m_cpVSAPI->getStride(a_cpFrame, 0);
+	const uint8_t * cpYRow = m_cpVSAPI->getReadPtr(a_cpFrame, 0);
+	uint8_t * pDest = tempBuffer.data();
+
+	for(size_t h = 0; h < height; ++h)
+	{
+		memcpy(pDest, cpYRow, width);
+		cpYRow += yStride;
+		pDest += width;
+	}
+
+	const int uStride = m_cpVSAPI->getStride(a_cpFrame, 1);
+	const uint8_t * cpURow = m_cpVSAPI->getReadPtr(a_cpFrame, 1);
+	const int vStride = m_cpVSAPI->getStride(a_cpFrame, 2);
+	const uint8_t * cpVRow = m_cpVSAPI->getReadPtr(a_cpFrame, 2);
+
+	for(size_t h = 0; h < (height / 2); ++h)
+	{
+		for(size_t w = 0; w < (width / 2); ++w)
+		{
+			*pDest = cpURow[w];
+			pDest++;
+			*pDest = cpVRow[w];
+			pDest++;
+		}
+		cpURow += uStride;
+		cpVRow += vStride;
+	}
+
+	CUarray array = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUarray(a_buffer);
+
+	CUDA_MEMCPY2D cuCopy2d;
+	memset(&cuCopy2d, 0, sizeof(cuCopy2d));
+	cuCopy2d.WidthInBytes = width;
+	cuCopy2d.srcMemoryType = CU_MEMORYTYPE_HOST;
+	cuCopy2d.srcHost = tempBuffer.data();
+	cuCopy2d.srcPitch = width;
+	cuCopy2d.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+	cuCopy2d.dstArray = array;
+	cuCopy2d.Height = height + height / 2;
+	cuMemcpy2D(&cuCopy2d);
+
+	cuCtxPopCurrent(nullptr);
 }
 
 //==============================================================================

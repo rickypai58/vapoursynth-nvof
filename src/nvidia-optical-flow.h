@@ -40,6 +40,9 @@ public:
 		std::string & a_errorString);
 
 	bool init(std::string & a_errorString);
+
+	void getFlow(const VSFrameRef * a_cpCurrentFrame, const VSFrameRef * a_cpDeltaFrame,
+		VSFrameRef * a_pOutFrame);
 private:
 	void releaseAPI();
 	void destroyContext();
@@ -47,6 +50,8 @@ private:
 	void destroyNVOF();
 	bool createBuffers(std::string & a_errorString);
 	void destroyBuffers();
+
+	void loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBufferHandle a_buffer);
 
 	const VSAPI * m_cpVSAPI{nullptr};
 	VSVideoInfo m_sourceVideoInfo{};
