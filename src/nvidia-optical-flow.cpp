@@ -481,6 +481,7 @@ void NVidiaOpticalFlow::downloadFlow(VSFrameRef * a_pFrame)
 
 	const int yStride = m_cpVSAPI->getStride(a_pFrame, 0);
 	uint8_t * pDestRow = m_cpVSAPI->getWritePtr(a_pFrame, 0);
+	ZeroMemory(pDestRow, yStride * height);
 	const uint8_t * pSrcRow = costTempBuffer.data();
 	for(size_t h = 0; h < height; ++h)
 	{
