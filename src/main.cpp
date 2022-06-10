@@ -28,6 +28,9 @@
 void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut,
 	void * a_pUserData, VSCore * a_pCore, const VSAPI * a_pVSAPI);
 
+void VS_CC createShow(const VSMap * a_pIn, VSMap * a_pOut,
+	void * a_pUserData, VSCore * a_pCore, const VSAPI * a_pVSAPI);
+
 //==============================================================================
 
 VS_EXTERNAL_API(void) VapourSynthPluginInit(VSConfigPlugin a_configFunc,
@@ -44,6 +47,11 @@ VS_EXTERNAL_API(void) VapourSynthPluginInit(VSConfigPlugin a_configFunc,
 		"speed:int:opt;"
 		"gpu:int:opt;"
 		, createGetFlow, nullptr, a_pPlugin);
+
+	a_registerFunc("show",
+		"clip:clip;"
+		"mode:int;"
+		, createShow, nullptr, a_pPlugin);
 }
 
 //==============================================================================

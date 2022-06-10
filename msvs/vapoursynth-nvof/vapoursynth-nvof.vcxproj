@@ -23,6 +23,7 @@
     <ClCompile Include="..\..\src\main.cpp" />
     <ClCompile Include="..\..\src\nvidia-optical-flow-api.cpp" />
     <ClCompile Include="..\..\src\nvidia-optical-flow.cpp" />
+    <ClCompile Include="..\..\src\show.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\common.h" />
