@@ -51,6 +51,7 @@ VS_EXTERNAL_API(void) VapourSynthPluginInit(VSConfigPlugin a_configFunc,
 	a_registerFunc("show",
 		"clip:clip;"
 		"mode:int;"
+		"amplify:float:opt;"
 		, createShow, nullptr, a_pPlugin);
 }
 

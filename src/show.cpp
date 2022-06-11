@@ -30,6 +30,86 @@
 
 //==============================================================================
 
+const double pi = 3.14159265358979323846;
+
+struct RGB{
+	double r;       // ¸ [0, 1]
+	double g;       // ¸ [0, 1]
+	double b;       // ¸ [0, 1]
+};
+
+struct RGB8{
+	uint8_t r;       // ¸ [0, 255]
+	uint8_t g;       // ¸ [0, 255]
+	uint8_t b;       // ¸ [0, 255]
+};
+
+struct HSV{
+	double h;       // ¸ [0, 2 * pi]
+	double s;       // ¸ [0, 1]
+	double v;       // ¸ [0, 1]
+};
+
+RGB hsv2rgb(HSV hsv)
+{
+	RGB rgb;
+	double h = hsv.h;
+	double s = hsv.s;
+	double v = hsv.v;
+
+	while(h >= 2. * pi)
+		h -= 2. * pi;
+	while(h < 0.)
+		h += 2. * pi;
+
+	h /= (pi / 3.);
+	double fract = h - floor(h);
+
+	double P = v * (1. - s);
+	double Q = v * (1. - s * fract);
+	double T = v * (1. - s * (1. - fract));
+
+	if(0. <= h && h < 1.)
+		rgb = RGB{v, T, P};
+	else if (1. <= h && h < 2.)
+		rgb = RGB{Q, v, P};
+	else if (2. <= h && h < 3.)
+		rgb = RGB{P, v, T};
+	else if (3. <= h && h < 4.)
+		rgb = RGB{P, Q, v};
+	else if (4. <= h && h < 5.)
+		rgb = RGB{T, P, v};
+	else if (5. <= h && h < 6.)
+		rgb = RGB{v, P, Q};
+	else
+		rgb = RGB{0., 0., 0.};
+
+	return rgb;
+}
+
+RGB8 fromUV(int16_t u16, int16_t v16, double amplify = 1.)
+{
+	const double maxLen = 1024. * sqrt(2.);
+
+	double u = (double)u16 / (1 << 5);
+	double v = (double)v16 / (1 << 5);
+
+	double h = atan2(v, u);
+	double s = sqrt(u * u + v * v) / maxLen * amplify;
+	if(s > 1.)
+		s = 1.;
+
+	RGB rgb = hsv2rgb({h, s, 0.5});
+
+	uint8_t r8 = uint8_t(rgb.r * 255.);
+	uint8_t g8 = uint8_t(rgb.g * 255.);
+	uint8_t b8 = uint8_t(rgb.b * 255.);
+
+	return RGB8{r8, g8, b8};
+}
+
+//==============================================================================
+
 enum class ShowMode
 {
 	Flow,
@@ -46,6 +126,7 @@ struct DataShow
 	const VSVideoInfo * pSourceVideoInfo{nullptr};
 	VSVideoInfo videoInfo{};
 	ShowMode mode{0};
+	double amplify{1.};
 };
 
 //==============================================================================
@@ -117,10 +198,17 @@ void VS_CC createShow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData,
 	internalData.mode = (ShowMode)mode;
 
 	//--------------------------------------------------------------------------
+	// amplify
+
+	double amplify = a_cpVSAPI->propGetFloat(a_pIn, "amplify", 0, &error);
+	if(error == 0)
+		internalData.amplify = amplify;
+
+	//--------------------------------------------------------------------------
 	// output video info
 
 	static std::map<ShowMode, const VSFormat *> formats{
-		{ShowMode::Flow, a_cpVSAPI->getFormatPreset(pfYUV444P16, a_pCore)},
+		{ShowMode::Flow, a_cpVSAPI->getFormatPreset(pfRGB24, a_pCore)},
 		{ShowMode::Cost, a_cpVSAPI->getFormatPreset(pfGray8, a_pCore)},
 	};
 	std::map<ShowMode, const VSFormat *>::const_iterator it =
@@ -203,35 +291,35 @@ const VSFrameRef * VS_CC getFrameShow(int a_n, int a_activationReason,
 
 	if(pInternalData->mode == ShowMode::Flow)
 	{
-		const uint16_t neutralY = 1 << 15;
-		const uint16_t neutralUV = (1 << 15) - 1;
+		int srcUStride = a_cpVSAPI->getStride(cpFlowFrame, 1);
+		const uint8_t * cpSrcURow = a_cpVSAPI->getReadPtr(cpFlowFrame, 1);
+		int srcVStride = a_cpVSAPI->getStride(cpFlowFrame, 2);
+		const uint8_t * cpSrcVRow = a_cpVSAPI->getReadPtr(cpFlowFrame, 2);
 
-		int dstYStride = a_cpVSAPI->getStride(pOutFrame, 0);
-		uint8_t * pDstYRow = a_cpVSAPI->getWritePtr(pOutFrame, 0);
+		int dstRStride = a_cpVSAPI->getStride(pOutFrame, 0);
+		uint8_t * pDstRRow = a_cpVSAPI->getWritePtr(pOutFrame, 0);
+		int dstGStride = a_cpVSAPI->getStride(pOutFrame, 1);
+		uint8_t * pDstGRow = a_cpVSAPI->getWritePtr(pOutFrame, 1);
+		int dstBStride = a_cpVSAPI->getStride(pOutFrame, 2);
+		uint8_t * pDstBRow = a_cpVSAPI->getWritePtr(pOutFrame, 2);
+
 		for(int h = 0; h < height; ++h)
 		{
-			uint16_t * pY16Row = (uint16_t *)pDstYRow;
+			const uint16_t * cpSrcU16Row = (const uint16_t *)cpSrcURow;
+			const uint16_t * cpSrcV16Row = (const uint16_t *)cpSrcVRow;
 			for(int w = 0; w < width; ++w)
-				pY16Row[w] = neutralY;
-			pDstYRow += dstYStride;
-		}
-
-		for(int p = 1; p <=2; ++p)
-		{
-			int srcStride = a_cpVSAPI->getStride(cpFlowFrame, p);
-			const uint8_t * cpSrcRow = a_cpVSAPI->getReadPtr(cpFlowFrame, p);
-			int dstStride = a_cpVSAPI->getStride(pOutFrame, p);
-			uint8_t * pDstRow = a_cpVSAPI->getWritePtr(pOutFrame, p);
-			
-			for(int h = 0; h < height; ++h)
 			{
-				const int16_t * cpSrc16Row = (const int16_t *)cpSrcRow;
-				uint16_t * pDst16Row = (uint16_t *)pDstRow;
-				for(int w = 0; w < width; ++w)
-					pDst16Row[w] = (uint16_t)((int32_t)cpSrc16Row[w] + neutralUV);
-				cpSrcRow += srcStride;
-				pDstRow += dstStride;
+				RGB8 rgb = fromUV(cpSrcU16Row[w], cpSrcV16Row[w], pInternalData->amplify);
+				pDstRRow[w] = rgb.r;
+				pDstGRow[w] = rgb.g;
+				pDstBRow[w] = rgb.b;
 			}
+			
+			cpSrcURow += srcUStride;
+			cpSrcVRow += srcVStride;
+			pDstRRow += dstRStride;
+			pDstGRow += dstGStride;
+			pDstBRow += dstBStride;
 		}
 	}
 	else if(pInternalData->mode == ShowMode::Cost)
