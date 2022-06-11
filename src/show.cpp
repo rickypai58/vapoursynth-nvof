@@ -96,8 +96,7 @@ RGB8 fromUV(int16_t u16, int16_t v16, double amplify = 1.)
 
 	double h = atan2(v, u);
 	double s = sqrt(u * u + v * v) / maxLen * amplify;
-	if(s > 1.)
-		s = 1.;
+	s = clamp(s, 0., 1.);
 
 	RGB rgb = hsv2rgb({h, s, 0.5});
 
@@ -332,7 +331,10 @@ const VSFrameRef * VS_CC getFrameShow(int a_n, int a_activationReason,
 		for(int h = 0; h < height; ++h)
 		{
 			for(int w = 0; w < width; ++w)
-				pDstRow[w] = cpSrcRow[w * 2];
+			{
+				double cost = double(cpSrcRow[w * 2]) * pInternalData->amplify;
+				pDstRow[w] = (uint8_t)clamp(cost, 0., 255.);
+			}
 			cpSrcRow += srcStride;
 			pDstRow += dstStride;
 		}
