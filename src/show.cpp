@@ -304,8 +304,8 @@ const VSFrameRef * VS_CC getFrameShow(int a_n, int a_activationReason,
 
 		for(int h = 0; h < height; ++h)
 		{
-			const uint16_t * cpSrcU16Row = (const uint16_t *)cpSrcURow;
-			const uint16_t * cpSrcV16Row = (const uint16_t *)cpSrcVRow;
+			const int16_t * cpSrcU16Row = (const int16_t *)cpSrcURow;
+			const int16_t * cpSrcV16Row = (const int16_t *)cpSrcVRow;
 			for(int w = 0; w < width; ++w)
 			{
 				RGB8 rgb = fromUV(cpSrcU16Row[w], cpSrcV16Row[w], pInternalData->amplify);
