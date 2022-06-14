@@ -26,7 +26,6 @@
 #include "common.h"
 #include "nvidia-optical-flow.h"
 
-#include <vector>
 #include <map>
 
 //==============================================================================

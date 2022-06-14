@@ -25,8 +25,8 @@
 
 #include "common.h"
 
-#include <vector>
-#include <map>
+#include <cassert>
+#include <cmath>
 
 //==============================================================================
 // Filter internal data structure
@@ -163,6 +163,79 @@ void VS_CC freeCompensate(void * a_pInstanceData, VSCore * a_pCore,
 
 //==============================================================================
 
+template<typename T>
+void compensatePlane(int a_plane, const VSFrameRef * a_cpCurrentFrame,
+	const VSFrameRef * a_cpDeltaFrame, const VSFrameRef * a_cpFlowFrame,
+	VSFrameRef * a_pOutFrame, const VSFormat * a_cpSourceFormat,
+	uint8_t a_costThreshold, const VSAPI * a_cpVSAPI)
+{
+	int divW = (a_plane == 0) ? 1 : 1 << a_cpSourceFormat->subSamplingW;
+	int divH = (a_plane == 0) ? 1 : 1 << a_cpSourceFormat->subSamplingH;
+	double divVecW = double(1 << 5) * double(divW);
+	double divVecH = double(1 << 5) * double(divH);
+
+	int width = a_cpVSAPI->getFrameWidth(a_cpCurrentFrame, a_plane);
+	int height = a_cpVSAPI->getFrameHeight(a_cpCurrentFrame, a_plane);
+
+	const uint8_t * cpCurrentPlane = a_cpVSAPI->getReadPtr(a_cpCurrentFrame, a_plane);
+	const uint8_t * cpDeltaPlane = a_cpVSAPI->getReadPtr(a_cpDeltaFrame, a_plane);
+	int sourceStride = a_cpVSAPI->getStride(a_cpCurrentFrame, a_plane);
+
+	const uint8_t * cpFlowUPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, 0);
+	const uint8_t * cpFlowVPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, 1);
+	const uint8_t * cpFlowCostPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, 2);
+	int flowStride = a_cpVSAPI->getStride(a_cpFlowFrame, 0);
+
+	const uint8_t * cpSrcRow = cpCurrentPlane;
+	uint8_t * pDstRow = a_cpVSAPI->getWritePtr(a_pOutFrame, a_plane);
+	int dstStride = a_cpVSAPI->getStride(a_pOutFrame, a_plane);
+
+	for(int h = 0; h < height; ++h)
+	{
+		const ptrdiff_t flowRowShift = (ptrdiff_t)h * divH * flowStride;
+		const int16_t * pFlowURow = (const int16_t *)(cpFlowUPlane + flowRowShift);
+		const int16_t * pFlowVRow = (const int16_t *)(cpFlowVPlane + flowRowShift);
+		const uint8_t * pFlowCostRow = (const uint8_t *)(cpFlowCostPlane + flowRowShift);
+
+		const T * cpSrcTypedRow = (const T *)cpSrcRow;
+		T * pDstTypedRow = (T *)pDstRow;
+		for(int w = 0; w < width; ++w)
+		{
+			uint8_t cost = pFlowCostRow[w * divW * 2];
+			double vecX = (double)pFlowURow[w * divW] / divVecW;
+			double vecY = (double)pFlowVRow[w * divW] / divVecH;
+			double x = (double)w + vecX;
+			double y = (double)h - vecY;
+
+			bool discard = (cost >= a_costThreshold) || (x < 0) || (x > (width - 1)) ||
+				(y < 0) || (y > (height - 1));
+
+			if(discard)
+			{
+				pDstTypedRow[w] = cpSrcTypedRow[w];
+				continue;
+			}
+
+			int x1 = (int)floor(x);
+			int x2 = (int)ceil(x);
+			double fracX = x - x1;
+			int y1 = (int)floor(y);
+			int y2 = (int)ceil(y);
+			double fracY = y - y1;
+
+			const T * cpDeltaRow1 = (const T *)(cpDeltaPlane + sourceStride * y1);
+			const T * cpDeltaRow2 = (const T *)(cpDeltaPlane + sourceStride * y2);
+			double rowSum1 = cpDeltaRow1[x1] * (1.0 - fracX) + cpDeltaRow1[x2] * fracX;
+			double rowSum2 = cpDeltaRow2[x1] * (1.0 - fracX) + cpDeltaRow2[x2] * fracX;
+			pDstTypedRow[w] = T(rowSum1 * (1.0 - fracY) + rowSum2 * fracY);
+		}
+		cpSrcRow += sourceStride;
+		pDstRow += dstStride;
+	}
+}
+
+//==============================================================================
+
 const VSFrameRef * VS_CC getFrameCompensate(int a_n, int a_activationReason,
 	void ** a_ppInstanceData, void ** a_ppFrameData,
 	VSFrameContext * a_pFrameCtx, VSCore * a_pCore, const VSAPI * a_cpVSAPI)
@@ -179,6 +252,7 @@ const VSFrameRef * VS_CC getFrameCompensate(int a_n, int a_activationReason,
 	{
 		a_cpVSAPI->requestFrameFilter(a_n, pInternalData->pInputNode.get(), a_pFrameCtx);
 		a_cpVSAPI->requestFrameFilter(n2, pInternalData->pInputNode.get(), a_pFrameCtx);
+		a_cpVSAPI->requestFrameFilter(a_n, pInternalData->pFlowNode.get(), a_pFrameCtx);
 		return nullptr;
 	}
 	else if(a_activationReason != arAllFramesReady)
@@ -190,14 +264,46 @@ const VSFrameRef * VS_CC getFrameCompensate(int a_n, int a_activationReason,
 		pInternalData->pInputNode.get(), a_pFrameCtx);
 	const VSFrameRef * cpDeltaFrame = a_cpVSAPI->getFrameFilter(n2,
 		pInternalData->pInputNode.get(), a_pFrameCtx);
+	const VSFrameRef * cpFlowFrame = a_cpVSAPI->getFrameFilter(a_n,
+		pInternalData->pFlowNode.get(), a_pFrameCtx);
 
 	VSFrameRef * pOutFrame = a_cpVSAPI->newVideoFrame(cpSourceFormat,
 		pInternalData->cpSourceVideoInfo->width, pInternalData->cpSourceVideoInfo->height,
 		cpCurrentFrame, a_pCore);
 
+	for(int plane = 0; plane < cpSourceFormat->numPlanes; ++plane)
+	{
+		if(cpSourceFormat->sampleType == stFloat)
+		{
+			if(cpSourceFormat->bytesPerSample == 4)
+				compensatePlane<float>(plane, cpCurrentFrame, cpDeltaFrame,
+					cpFlowFrame, pOutFrame, cpSourceFormat,
+					pInternalData->costThreshold, a_cpVSAPI);
+			else
+				assert(false);
+		}
+		else
+		{
+			if(cpSourceFormat->bytesPerSample == 1)
+				compensatePlane<uint8_t>(plane, cpCurrentFrame, cpDeltaFrame,
+					cpFlowFrame, pOutFrame, cpSourceFormat,
+					pInternalData->costThreshold, a_cpVSAPI);
+			else if(cpSourceFormat->bytesPerSample == 2)
+				compensatePlane<uint16_t>(plane, cpCurrentFrame, cpDeltaFrame,
+					cpFlowFrame, pOutFrame, cpSourceFormat,
+					pInternalData->costThreshold, a_cpVSAPI);
+			else if(cpSourceFormat->bytesPerSample == 4)
+				compensatePlane<uint32_t>(plane, cpCurrentFrame, cpDeltaFrame,
+					cpFlowFrame, pOutFrame, cpSourceFormat,
+					pInternalData->costThreshold, a_cpVSAPI);
+			else
+				assert(false);
+		}
+	}
 
 	a_cpVSAPI->freeFrame(cpCurrentFrame);
 	a_cpVSAPI->freeFrame(cpDeltaFrame);
+	a_cpVSAPI->freeFrame(cpFlowFrame);
 
 	return pOutFrame;
 }
