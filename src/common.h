@@ -32,6 +32,8 @@
 #include <vapoursynth/VSHelper.h>
 #pragma warning(pop)
 
+#include<memory>
+
 #ifdef _WIN32
 	#include <Windows.h>
 	using FSChar = wchar_t;
@@ -42,6 +44,19 @@
 #endif
 
 #define UNUSED(x) (void)(x)
+
+//==============================================================================
+
+struct FreeNodeRef
+{
+	const VSAPI * m_cpVSAPI{nullptr};
+	void operator()(VSNodeRef * a_pNode) const
+	{
+		m_cpVSAPI->freeNode(a_pNode);
+	}
+};
+
+using PtrNodeRef = std::unique_ptr<VSNodeRef, FreeNodeRef>;
 
 //==============================================================================
 

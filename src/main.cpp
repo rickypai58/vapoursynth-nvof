@@ -31,6 +31,9 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut,
 void VS_CC createShow(const VSMap * a_pIn, VSMap * a_pOut,
 	void * a_pUserData, VSCore * a_pCore, const VSAPI * a_pVSAPI);
 
+void VS_CC createCompensate(const VSMap * a_pIn, VSMap * a_pOut,
+	void * a_pUserData, VSCore * a_pCore, const VSAPI * a_pVSAPI);
+
 //==============================================================================
 
 VS_EXTERNAL_API(void) VapourSynthPluginInit(VSConfigPlugin a_configFunc,
@@ -53,6 +56,13 @@ VS_EXTERNAL_API(void) VapourSynthPluginInit(VSConfigPlugin a_configFunc,
 		"mode:int;"
 		"amplify:float:opt;"
 		, createShow, nullptr, a_pPlugin);
+
+	a_registerFunc("compensate",
+		"clip:clip;"
+		"flow:clip;"
+		"delta:int;"
+		"cost_threshold:int:opt;"
+		, createCompensate, nullptr, a_pPlugin);
 }
 
 //==============================================================================

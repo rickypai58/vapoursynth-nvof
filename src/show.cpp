@@ -98,7 +98,7 @@ RGB8 fromUV(int16_t u16, int16_t v16, double amplify = 1.)
 	double s = sqrt(u * u + v * v) / maxLen * amplify;
 	s = clamp(s, 0., 1.);
 
-	RGB rgb = hsv2rgb({h, s, 0.5});
+	RGB rgb = hsv2rgb({h, s, 1.0});
 
 	uint8_t r8 = uint8_t(rgb.r * 255.);
 	uint8_t g8 = uint8_t(rgb.g * 255.);
@@ -121,8 +121,8 @@ enum class ShowMode
 
 struct DataShow
 {
-	VSNodeRef * pInputNode{nullptr};
-	const VSVideoInfo * pSourceVideoInfo{nullptr};
+	PtrNodeRef pInputNode{nullptr};
+	const VSVideoInfo * cpSourceVideoInfo{nullptr};
 	VSVideoInfo videoInfo{};
 	ShowMode mode{0};
 	double amplify{1.};
@@ -150,23 +150,21 @@ void VS_CC createShow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData,
 
 	DataShow internalData;
 
-	internalData.pInputNode = a_cpVSAPI->propGetNode(a_pIn, "clip", 0, 0);
-	internalData.pSourceVideoInfo = a_cpVSAPI->getVideoInfo(internalData.pInputNode);
+	internalData.pInputNode = PtrNodeRef(a_cpVSAPI->propGetNode(a_pIn, "clip", 0, 0), FreeNodeRef{a_cpVSAPI});
+	internalData.cpSourceVideoInfo = a_cpVSAPI->getVideoInfo(internalData.pInputNode.get());
 
 	//--------------------------------------------------------------------------
 	// Format check
 
-	const VSFormat * pFormat = internalData.pSourceVideoInfo->format;
+	const VSFormat * cpFormat = internalData.cpSourceVideoInfo->format;
 
-	bool acceptableFormat = isConstantFormat(internalData.pSourceVideoInfo) &&
-		(internalData.pSourceVideoInfo->numFrames != 0) && 
-		(pFormat == a_cpVSAPI->getFormatPreset(pfYUV444P16, a_pCore));
+	bool acceptableFormat = isConstantFormat(internalData.cpSourceVideoInfo) &&
+		(internalData.cpSourceVideoInfo->numFrames != 0) && 
+		(cpFormat == a_cpVSAPI->getFormatPreset(pfYUV444P16, a_pCore));
 	if(!acceptableFormat)
 	{
 		a_cpVSAPI->setError(a_pOut, "nvof.show: "
 			"input clip format doesn't match the NVOF flow format.");
-		a_cpVSAPI->freeNode(internalData.pInputNode);
-
 		return;
 	}
 
@@ -179,7 +177,6 @@ void VS_CC createShow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData,
 	{
 		a_cpVSAPI->setError(a_pOut, "nvof.Show: "
 			"failed to initialize the \"mode\" argument.");
-		a_cpVSAPI->freeNode(internalData.pInputNode);
 		return;
 	}
 
@@ -190,7 +187,6 @@ void VS_CC createShow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData,
 			"Supported modes are:\n"
 			"0: Flow\n"
 			"1: Cost");
-		a_cpVSAPI->freeNode(internalData.pInputNode);
 		return;
 	}
 
@@ -216,11 +212,10 @@ void VS_CC createShow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData,
 	{
 		a_cpVSAPI->setError(a_pOut, "nvof.Show: "
 			"no output format for selected mode. Kick the programmer.");
-		a_cpVSAPI->freeNode(internalData.pInputNode);
 		return;
 	}
 
-	internalData.videoInfo = *internalData.pSourceVideoInfo;
+	internalData.videoInfo = *internalData.cpSourceVideoInfo;
 	internalData.videoInfo.format = it->second;
 
 	//--------------------------------------------------------------------------
@@ -253,7 +248,6 @@ void VS_CC freeShow(void * a_pInstanceData, VSCore * a_pCore,
 	UNUSED(a_pCore);
 
 	DataShow * pInternalData = (DataShow *)a_pInstanceData;
-	a_cpVSAPI->freeNode(pInternalData->pInputNode);
 	delete pInternalData;
 }
 
@@ -266,15 +260,15 @@ const VSFrameRef * VS_CC getFrameShow(int a_n, int a_activationReason,
 	UNUSED(a_ppFrameData);
 
 	DataShow * pInternalData = (DataShow *) *a_ppInstanceData;
-	int framesNumber = pInternalData->pSourceVideoInfo->numFrames;
-	int width = pInternalData->pSourceVideoInfo->width;
-	int height = pInternalData->pSourceVideoInfo->height;
+	int framesNumber = pInternalData->cpSourceVideoInfo->numFrames;
+	int width = pInternalData->cpSourceVideoInfo->width;
+	int height = pInternalData->cpSourceVideoInfo->height;
 
 	a_n = clamp(a_n, 0, framesNumber - 1);
 
 	if(a_activationReason == arInitial)
 	{
-		a_cpVSAPI->requestFrameFilter(a_n, pInternalData->pInputNode, a_pFrameCtx);
+		a_cpVSAPI->requestFrameFilter(a_n, pInternalData->pInputNode.get(), a_pFrameCtx);
 		return nullptr;
 	}
 	else if(a_activationReason != arAllFramesReady)
@@ -283,7 +277,7 @@ const VSFrameRef * VS_CC getFrameShow(int a_n, int a_activationReason,
 	const VSFormat * cpFormat = pInternalData->videoInfo.format;
 
 	const VSFrameRef * cpFlowFrame = a_cpVSAPI->getFrameFilter(a_n,
-		pInternalData->pInputNode, a_pFrameCtx);
+		pInternalData->pInputNode.get(), a_pFrameCtx);
 
 	VSFrameRef * pOutFrame = a_cpVSAPI->newVideoFrame(cpFormat, width, height,
 		cpFlowFrame, a_pCore);

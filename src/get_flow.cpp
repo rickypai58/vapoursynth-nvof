@@ -34,8 +34,8 @@
 
 struct DataGetFlow
 {
-	VSNodeRef * pInputNode{nullptr};
-	const VSVideoInfo * pSourceVideoInfo{nullptr};
+	PtrNodeRef pInputNode{nullptr};
+	const VSVideoInfo * cpSourceVideoInfo{nullptr};
 	VSVideoInfo videoInfo{};
 	int64_t delta{1};
 	int64_t chromaMotion{1};
@@ -73,21 +73,20 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 
 	DataGetFlow internalData;
 
-	internalData.pInputNode = a_cpVSAPI->propGetNode(a_pIn, "clip", 0, 0);
-	internalData.pSourceVideoInfo = a_cpVSAPI->getVideoInfo(internalData.pInputNode);
+	internalData.pInputNode = PtrNodeRef(a_cpVSAPI->propGetNode(a_pIn, "clip", 0, 0), FreeNodeRef{a_cpVSAPI});
+	internalData.cpSourceVideoInfo = a_cpVSAPI->getVideoInfo(internalData.pInputNode.get());
 
 	//--------------------------------------------------------------------------
 	// Format check
 
-	const VSFormat * pFormat = internalData.pSourceVideoInfo->format;
+	const VSFormat * pFormat = internalData.cpSourceVideoInfo->format;
 
-	bool acceptableFormat = isConstantFormat(internalData.pSourceVideoInfo) &&
-		(internalData.pSourceVideoInfo->numFrames != 0);
+	bool acceptableFormat = isConstantFormat(internalData.cpSourceVideoInfo) &&
+		(internalData.cpSourceVideoInfo->numFrames != 0);
 	if(!acceptableFormat)
 	{
 		a_cpVSAPI->setError(a_pOut, "nvof.getFlow: "
 			"only constant format input with fixed frame number is supported.");
-		a_cpVSAPI->freeNode(internalData.pInputNode);
 		NVidiaOpticalFlowAPI::destroy(errorString);
 		return;
 	}
@@ -101,7 +100,6 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 	{
 		a_cpVSAPI->setError(a_pOut, "nvof.getFlow: "
 			"failed to initialize the \"delta\" argument.");
-		a_cpVSAPI->freeNode(internalData.pInputNode);
 		NVidiaOpticalFlowAPI::destroy(errorString);
 		return;
 	}
@@ -116,12 +114,11 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 		error = 0;
 	}
 
-	if(NVidiaOpticalFlow::bufferFormat(internalData.pSourceVideoInfo->format,
+	if(NVidiaOpticalFlow::bufferFormat(internalData.cpSourceVideoInfo->format,
 		internalData.chromaMotion, errorString) == NV_OF_BUFFER_FORMAT_UNDEFINED)
 	{
 		a_cpVSAPI->setError(a_pOut, (std::string("nvof.getFlow: "
 			"Source format error. ") + errorString).c_str());
-		a_cpVSAPI->freeNode(internalData.pInputNode);
 			NVidiaOpticalFlowAPI::destroy(errorString);
 		return;
 	}
@@ -153,7 +150,6 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 			"1 - medium, medium quality\n"
 			"2 - fast, low quality\n"
 			);
-		a_cpVSAPI->freeNode(internalData.pInputNode);
 		NVidiaOpticalFlowAPI::destroy(errorString);
 		return;
 	}
@@ -173,7 +169,7 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 	//--------------------------------------------------------------------------
 	// output video info
 
-	internalData.videoInfo = *internalData.pSourceVideoInfo;
+	internalData.videoInfo = *internalData.cpSourceVideoInfo;
 	internalData.videoInfo.format = a_cpVSAPI->registerFormat(
 		cmYUV, stInteger, 16, 0, 0, a_pCore);
 
@@ -207,7 +203,6 @@ void VS_CC freeGetFlow(void * a_pInstanceData, VSCore * a_pCore,
 	UNUSED(a_pCore);
 
 	DataGetFlow * pInternalData = (DataGetFlow *)a_pInstanceData;
-	a_cpVSAPI->freeNode(pInternalData->pInputNode);
 	delete pInternalData;
 
 	std::string errorString;
@@ -223,27 +218,27 @@ const VSFrameRef * VS_CC getFrameGetFlow(int a_n, int a_activationReason,
 	UNUSED(a_ppFrameData);
 
 	DataGetFlow * pInternalData = (DataGetFlow *) *a_ppInstanceData;
-	int framesNumber = pInternalData->pSourceVideoInfo->numFrames;
+	int framesNumber = pInternalData->cpSourceVideoInfo->numFrames;
 
 	a_n = clamp(a_n, 0, framesNumber - 1);
 	int n2 = clamp(a_n + (int)pInternalData->delta, 0, framesNumber - 1);
 
 	if(a_activationReason == arInitial)
 	{
-		a_cpVSAPI->requestFrameFilter(a_n, pInternalData->pInputNode, a_pFrameCtx);
-		a_cpVSAPI->requestFrameFilter(n2, pInternalData->pInputNode, a_pFrameCtx);
+		a_cpVSAPI->requestFrameFilter(a_n, pInternalData->pInputNode.get(), a_pFrameCtx);
+		a_cpVSAPI->requestFrameFilter(n2, pInternalData->pInputNode.get(), a_pFrameCtx);
 		return nullptr;
 	}
 	else if(a_activationReason != arAllFramesReady)
 		return nullptr;
 
-	const VSFormat * cpSourceFormat = pInternalData->pSourceVideoInfo->format;
+	const VSFormat * cpSourceFormat = pInternalData->cpSourceVideoInfo->format;
 	const VSFormat * cpFormat = pInternalData->videoInfo.format;
 
 	const VSFrameRef * cpCurrentFrame = a_cpVSAPI->getFrameFilter(a_n,
-		pInternalData->pInputNode, a_pFrameCtx);
+		pInternalData->pInputNode.get(), a_pFrameCtx);
 	const VSFrameRef * cpDeltaFrame = a_cpVSAPI->getFrameFilter(n2,
-		pInternalData->pInputNode, a_pFrameCtx);
+		pInternalData->pInputNode.get(), a_pFrameCtx);
 
 	VSFrameRef * pOutFrame = a_cpVSAPI->newVideoFrame(cpFormat,
 		pInternalData->videoInfo.width, pInternalData->videoInfo.height,
@@ -252,7 +247,7 @@ const VSFrameRef * VS_CC getFrameGetFlow(int a_n, int a_activationReason,
 	std::string errorString;
 
 	NVidiaOpticalFlow flow(a_cpVSAPI,
-		*pInternalData->pSourceVideoInfo,
+		*pInternalData->cpSourceVideoInfo,
 		(bool)pInternalData->chromaMotion,
 		pInternalData->perfLevel,
 		(int)pInternalData->gpu);
