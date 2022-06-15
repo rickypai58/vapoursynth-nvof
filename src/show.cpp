@@ -93,7 +93,7 @@ RGB8 fromUV(int16_t u16, int16_t v16, double amplify = 1.)
 	double u = (double)u16 / (1 << 5);
 	double v = (double)v16 / (1 << 5);
 
-	double h = atan2(v, u);
+	double h = atan2(-v, u);
 	double s = sqrt(u * u + v * v) / maxLen * amplify;
 	s = clamp(s, 0., 1.);
 

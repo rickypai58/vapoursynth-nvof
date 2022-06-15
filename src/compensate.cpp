@@ -205,7 +205,7 @@ void compensatePlane(int a_plane, const VSFrameRef * a_cpCurrentFrame,
 			double vecX = (double)pFlowURow[w * divW] / divVecW;
 			double vecY = (double)pFlowVRow[w * divW] / divVecH;
 			double x = (double)w + vecX;
-			double y = (double)h - vecY;
+			double y = (double)h + vecY;
 
 			bool discard = (cost >= a_costThreshold) || (x < 0) || (x > (width - 1)) ||
 				(y < 0) || (y > (height - 1));
