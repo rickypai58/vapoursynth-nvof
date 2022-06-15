@@ -80,13 +80,13 @@ void VS_CC createCompensate(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserD
 	}
 
 	const VSVideoInfo * cpFlowInfo = a_cpVSAPI->getVideoInfo(internalData.pFlowNode.get());
-	const VSFormat * cpFlowFormat = internalData.cpSourceVideoInfo->format;
+	const VSFormat * cpFlowFormat = cpFlowInfo->format;
 
 	acceptableFormat = isConstantFormat(cpFlowInfo) &&
 		(cpFlowFormat == a_cpVSAPI->getFormatPreset(pfYUV444P16, a_pCore));
 	if(!acceptableFormat)
 	{
-		a_cpVSAPI->setError(a_pOut, "nvof.show: "
+		a_cpVSAPI->setError(a_pOut, "nvof.Compensate: "
 			"flow clip format is invalid.");
 		return;
 	}
@@ -96,7 +96,7 @@ void VS_CC createCompensate(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserD
 		(internalData.cpSourceVideoInfo->numFrames == cpFlowInfo->numFrames);
 	if(!match)
 	{
-		a_cpVSAPI->setError(a_pOut, "nvof.show: "
+		a_cpVSAPI->setError(a_pOut, "nvof.Compensate: "
 			"input clip and flow don't match in size or length.");
 		return;
 	}
