@@ -241,7 +241,7 @@ const VSFrameRef * VS_CC getFrameGetFlow(int a_n, int a_activationReason,
 
 	VSFrameRef * pOutFrame = a_cpVSAPI->newVideoFrame(cpFormat,
 		pInternalData->videoInfo.width, pInternalData->videoInfo.height,
-		cpCurrentFrame, a_pCore);
+		nullptr, a_pCore);
 
 	std::string errorString;
 
