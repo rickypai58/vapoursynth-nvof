@@ -279,7 +279,7 @@ const VSFrameRef * VS_CC getFrameShow(int a_n, int a_activationReason,
 		pInternalData->pInputNode.get(), a_pFrameCtx);
 
 	VSFrameRef * pOutFrame = a_cpVSAPI->newVideoFrame(cpFormat, width, height,
-		cpFlowFrame, a_pCore);
+		nullptr, a_pCore);
 
 	if(pInternalData->mode == ShowMode::Flow)
 	{
