@@ -444,9 +444,9 @@ void NVidiaOpticalFlow::downloadFlow(VSFrameRef * a_pFrame)
 	const size_t width = m_sourceVideoInfo.width;
 	const size_t height = m_sourceVideoInfo.height;
 
-	size_t flowTempBufferSize = width * height * 2;
-	size_t flowTempBufferStride = width * sizeof(uint16_t) * 2;
-	std::vector<uint16_t> flowTempBuffer(flowTempBufferSize, 0);
+	size_t flowTempBufferSize = width * height;
+	size_t flowTempBufferStride = width * sizeof(NV_OF_FLOW_VECTOR);
+	std::vector<NV_OF_FLOW_VECTOR> flowTempBuffer(flowTempBufferSize, {0});
 	std::vector<uint8_t> costTempBuffer(width * height, 0);
 
 	CUdeviceptr flowDevicePtr = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUdeviceptr(m_hFlow);
@@ -495,20 +495,19 @@ void NVidiaOpticalFlow::downloadFlow(VSFrameRef * a_pFrame)
 	const int vStride = m_cpVSAPI->getStride(a_pFrame, 2);
 	uint8_t * pDestURow = m_cpVSAPI->getWritePtr(a_pFrame, 1);
 	uint8_t * pDestVRow = m_cpVSAPI->getWritePtr(a_pFrame, 2);
-	const size_t flowStrideInElements = width * 2;
-	const uint16_t * cpSrcRow = flowTempBuffer.data();
+	const NV_OF_FLOW_VECTOR * cpSrcRow = flowTempBuffer.data();
 	for(size_t h = 0; h < height; ++h)
 	{
-		uint16_t * pURow16 = (uint16_t *)pDestURow;
-		uint16_t * pVRow16 = (uint16_t *)pDestVRow;
+		int16_t * pURow16 = (int16_t *)pDestURow;
+		int16_t * pVRow16 = (int16_t *)pDestVRow;
 		for(size_t w = 0; w < width; ++w)
 		{
-			pURow16[w] = cpSrcRow[w << 1];
-			pVRow16[w] = cpSrcRow[(w << 1) | 1];
+			pURow16[w] = cpSrcRow[w].flowx;
+			pVRow16[w] = cpSrcRow[w].flowy;
 		}
 		pDestURow += uStride;
 		pDestVRow += vStride;
-		cpSrcRow += flowStrideInElements;
+		cpSrcRow += width;
 	}
 }
 
