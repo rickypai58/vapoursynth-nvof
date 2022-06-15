@@ -163,7 +163,8 @@ void NVidiaOpticalFlow::getFlow(const VSFrameRef * a_cpCurrentFrame,
 	}
 	else if(m_sourceBufferFormat == NV_OF_BUFFER_FORMAT_ABGR8)
 	{
-		return;
+		loadRGBtoBuffer(a_cpCurrentFrame, m_hSourceFrame);
+		loadRGBtoBuffer(a_cpDeltaFrame, m_hDeltaFrame);
 	}
 	
 	NV_OF_EXECUTE_INPUT_PARAMS inputParams{0};
@@ -430,6 +431,56 @@ void NVidiaOpticalFlow::loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPU
 	cuCopy2d.dstDevice = devicePtr;
 	cuCopy2d.dstPitch = strideInfo.strideInfo[0].strideXInBytes;
 	cuCopy2d.Height = height + height / 2;
+
+	cuMemcpy2D(&cuCopy2d);
+	cuCtxPopCurrent(nullptr);
+}
+
+//==============================================================================
+
+void NVidiaOpticalFlow::loadRGBtoBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBufferHandle a_buffer)
+{
+	const size_t width = m_sourceVideoInfo.width;
+	const size_t height = m_sourceVideoInfo.height;
+	const size_t widthInBytes = width * sizeof(RGBA32);
+	
+	std::vector<RGBA32> tempBuffer(width * height);
+
+	const int srcStride = m_cpVSAPI->getStride(a_cpFrame, 0);
+	const uint8_t * cpRRow = m_cpVSAPI->getReadPtr(a_cpFrame, 0);
+	const uint8_t * cpGRow = m_cpVSAPI->getReadPtr(a_cpFrame, 1);
+	const uint8_t * cpBRow = m_cpVSAPI->getReadPtr(a_cpFrame, 2);
+
+	RGBA32 * pDest = tempBuffer.data();
+
+	for(size_t h = 0; h < height; ++h)
+	{
+		for(size_t w = 0; w < width; ++w)
+		{
+			*pDest = RGBA32{cpRRow[w], cpGRow[w], cpBRow[w], 0xFF};
+			pDest++;
+		}
+		cpRRow += srcStride;
+		cpGRow += srcStride;
+		cpBRow += srcStride;
+	}
+
+	cuCtxPushCurrent(m_context);
+
+	CUdeviceptr devicePtr = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUdeviceptr(a_buffer);
+
+	NV_OF_CUDA_BUFFER_STRIDE_INFO strideInfo{};
+	NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetStrideInfo(a_buffer, &strideInfo);
+
+	CUDA_MEMCPY2D cuCopy2d{0};
+	cuCopy2d.WidthInBytes = widthInBytes;
+	cuCopy2d.srcMemoryType = CU_MEMORYTYPE_HOST;
+	cuCopy2d.srcHost = tempBuffer.data();
+	cuCopy2d.srcPitch = widthInBytes;
+	cuCopy2d.dstMemoryType = CU_MEMORYTYPE_DEVICE;
+	cuCopy2d.dstDevice = devicePtr;
+	cuCopy2d.dstPitch = strideInfo.strideInfo[0].strideXInBytes;
+	cuCopy2d.Height = height;
 
 	cuMemcpy2D(&cuCopy2d);
 	cuCtxPopCurrent(nullptr);

@@ -47,6 +47,18 @@
 
 //==============================================================================
 
+#pragma pack(push, 1)
+struct RGBA32
+{
+	uint8_t r{0x00};
+	uint8_t g{0x00};
+	uint8_t b{0x00};
+	uint8_t a{0xFF};
+};
+#pragma pack(pop)
+
+//==============================================================================
+
 struct FreeNodeRef
 {
 	const VSAPI * m_cpVSAPI{nullptr};

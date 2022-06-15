@@ -53,6 +53,7 @@ private:
 
 	void loadLumaToBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBufferHandle a_buffer);
 	void loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBufferHandle a_buffer);
+	void loadRGBtoBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBufferHandle a_buffer);
 	void downloadFlow(VSFrameRef * a_cpFrame);
 
 	const VSAPI * m_cpVSAPI{nullptr};
