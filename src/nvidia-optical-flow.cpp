@@ -24,8 +24,10 @@
 //==============================================================================
 
 #include "nvidia-optical-flow.h"
+
+#include "cuda-tools.h"
+
 #include <cassert>
-#include <vector>
 
 //==============================================================================
 
@@ -384,7 +386,7 @@ void NVidiaOpticalFlow::loadYUV420toBuffer(const VSFrameRef * a_cpFrame, NvOFGPU
 	const size_t tempBufferUVSize = width * height / 2;
 	const size_t tempBufferSize = tempBufferYSize + tempBufferUVSize;
 
-	std::vector<uint8_t> tempBuffer(tempBufferSize, 0);
+	CUDAHostVector<uint8_t> tempBuffer(tempBufferSize, 0);
 
 	const int yStride = m_cpVSAPI->getStride(a_cpFrame, 0);
 	const uint8_t * cpYRow = m_cpVSAPI->getReadPtr(a_cpFrame, 0);
@@ -444,7 +446,7 @@ void NVidiaOpticalFlow::loadRGBtoBuffer(const VSFrameRef * a_cpFrame, NvOFGPUBuf
 	const size_t height = m_sourceVideoInfo.height;
 	const size_t widthInBytes = width * sizeof(RGBA32);
 	
-	std::vector<RGBA32> tempBuffer(width * height);
+	CUDAHostVector<RGBA32> tempBuffer(width * height);
 
 	const int srcStride = m_cpVSAPI->getStride(a_cpFrame, 0);
 	const uint8_t * cpRRow = m_cpVSAPI->getReadPtr(a_cpFrame, 0);
@@ -497,8 +499,8 @@ void NVidiaOpticalFlow::downloadFlow(VSFrameRef * a_pFrame)
 
 	size_t flowTempBufferSize = width * height;
 	size_t flowTempBufferStride = width * sizeof(NV_OF_FLOW_VECTOR);
-	std::vector<NV_OF_FLOW_VECTOR> flowTempBuffer(flowTempBufferSize, {0});
-	std::vector<uint8_t> costTempBuffer(width * height, 0);
+	CUDAHostVector<NV_OF_FLOW_VECTOR> flowTempBuffer(flowTempBufferSize, {0});
+	CUDAHostVector<uint8_t> costTempBuffer(width * height, 0);
 
 	CUdeviceptr flowDevicePtr = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUdeviceptr(m_hFlow);
 	CUdeviceptr costDevicePtr = NVidiaOpticalFlowAPI::getAPI()->nvOFGPUBufferGetCUdeviceptr(m_hCost);
