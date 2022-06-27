@@ -32,21 +32,21 @@
 const double pi = 3.14159265358979323846;
 
 struct RGB{
-	double r;       // �� [0, 1]
-	double g;       // �� [0, 1]
-	double b;       // �� [0, 1]
+	double r;       // ∈ [0, 1]
+	double g;       // ∈ [0, 1]
+	double b;       // ∈ [0, 1]
 };
 
 struct RGB8{
-	uint8_t r;       // �� [0, 255]
-	uint8_t g;       // �� [0, 255]
-	uint8_t b;       // �� [0, 255]
+	uint8_t r;       // ∈ [0, 255]
+	uint8_t g;       // ∈ [0, 255]
+	uint8_t b;       // ∈ [0, 255]
 };
 
 struct HSV{
-	double h;       // �� [0, 2 * pi]
-	double s;       // �� [0, 1]
-	double v;       // �� [0, 1]
+	double h;       // ∈ [0, 2 * pi]
+	double s;       // ∈ [0, 1]
+	double v;       // ∈ [0, 1]
 };
 
 RGB hsv2rgb(HSV hsv)
@@ -324,7 +324,7 @@ const VSFrameRef * VS_CC getFrameShow(int a_n, int a_activationReason,
 			float * pFloatDstRow = (float *)pDstRow;
 			for(int w = 0; w < width; ++w)
 			{
-				float cost = pFloatSrcRow[w] * pInternalData->amplify;
+				float cost = float(pFloatSrcRow[w] * pInternalData->amplify);
 				pFloatDstRow[w] = clamp(cost, 0.f, 1.0f);
 			}
 			cpSrcRow += srcStride;
