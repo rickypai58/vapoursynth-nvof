@@ -79,6 +79,14 @@ void VS_CC createCompensate(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserD
 		return;
 	}
 
+	const VSFormat * cpSourceFormat = internalData.cpSourceVideoInfo->format;
+	if((cpSourceFormat->sampleType == stFloat) && (cpSourceFormat->bytesPerSample == 2))
+	{
+		a_cpVSAPI->setError(a_pOut, "nvof.Compensate: "
+			"half precision float formats are not supported.");
+		return;
+	}
+
 	const VSVideoInfo * cpFlowInfo = a_cpVSAPI->getVideoInfo(internalData.pFlowNode.get());
 	const VSFormat * cpFlowFormat = cpFlowInfo->format;
 
