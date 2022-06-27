@@ -281,31 +281,30 @@ const VSFrameRef * VS_CC getFrameCompensate(int a_n, int a_activationReason,
 
 	for(int plane = 0; plane < cpSourceFormat->numPlanes; ++plane)
 	{
+		auto compensatePlaneType = [&](auto arg)
+		{
+			using T = std::decay_t<decltype(arg)>;
+			compensatePlane<T>(plane, cpCurrentFrame, cpDeltaFrame,
+				cpFlowFrame, pOutFrame, cpSourceFormat,
+				pInternalData->costThreshold, a_cpVSAPI);
+		};
+
 		if(cpSourceFormat->sampleType == stFloat)
 		{
 			if(cpSourceFormat->bytesPerSample == 4)
-				compensatePlane<float>(plane, cpCurrentFrame, cpDeltaFrame,
-					cpFlowFrame, pOutFrame, cpSourceFormat,
-					pInternalData->costThreshold, a_cpVSAPI);
+				compensatePlaneType(float());
 			else
 				assert(false);
 		}
 		else
 		{
-			if(cpSourceFormat->bytesPerSample == 1)
-				compensatePlane<uint8_t>(plane, cpCurrentFrame, cpDeltaFrame,
-					cpFlowFrame, pOutFrame, cpSourceFormat,
-					pInternalData->costThreshold, a_cpVSAPI);
-			else if(cpSourceFormat->bytesPerSample == 2)
-				compensatePlane<uint16_t>(plane, cpCurrentFrame, cpDeltaFrame,
-					cpFlowFrame, pOutFrame, cpSourceFormat,
-					pInternalData->costThreshold, a_cpVSAPI);
-			else if(cpSourceFormat->bytesPerSample == 4)
-				compensatePlane<uint32_t>(plane, cpCurrentFrame, cpDeltaFrame,
-					cpFlowFrame, pOutFrame, cpSourceFormat,
-					pInternalData->costThreshold, a_cpVSAPI);
-			else
-				assert(false);
+			switch(cpSourceFormat->bytesPerSample)
+			{
+			case 1: compensatePlaneType(uint8_t()); break;
+			case 2: compensatePlaneType(uint16_t()); break;
+			case 4: compensatePlaneType(uint32_t()); break;
+			default: assert(false);
+			}
 		}
 	}
 
