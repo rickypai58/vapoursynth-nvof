@@ -532,17 +532,22 @@ void NVidiaOpticalFlow::downloadFlow(VSFrameRef * a_pFrame)
 
 	cuCtxPopCurrent(nullptr);
 
+	const float COST_NORM = 255.0f;
+
 	const int yStride = m_cpVSAPI->getStride(a_pFrame, 0);
 	uint8_t * pDestRow = m_cpVSAPI->getWritePtr(a_pFrame, 0);
 	ZeroMemory(pDestRow, yStride * height);
 	const uint8_t * pSrcRow = costTempBuffer.data();
 	for(size_t h = 0; h < height; ++h)
 	{
+		float * pFloatRow = (float *)pDestRow;
 		for(size_t w = 0; w < width; ++w)
-			pDestRow[w << 1] = pSrcRow[w];
+			pFloatRow[w] = (float)pSrcRow[w] / COST_NORM;
 		pDestRow += yStride;
 		pSrcRow += width;
 	}
+
+	const float VEC_LEN_DENOM = float(1 << 5);
 
 	const int uStride = m_cpVSAPI->getStride(a_pFrame, 1);
 	const int vStride = m_cpVSAPI->getStride(a_pFrame, 2);
@@ -551,12 +556,12 @@ void NVidiaOpticalFlow::downloadFlow(VSFrameRef * a_pFrame)
 	const NV_OF_FLOW_VECTOR * cpSrcRow = flowTempBuffer.data();
 	for(size_t h = 0; h < height; ++h)
 	{
-		int16_t * pURow16 = (int16_t *)pDestURow;
-		int16_t * pVRow16 = (int16_t *)pDestVRow;
+		float * pFloatURow = (float *)pDestURow;
+		float * pFloatVRow = (float *)pDestVRow;
 		for(size_t w = 0; w < width; ++w)
 		{
-			pURow16[w] = cpSrcRow[w].flowx;
-			pVRow16[w] = cpSrcRow[w].flowy;
+			pFloatURow[w] = (float)cpSrcRow[w].flowx / VEC_LEN_DENOM;
+			pFloatVRow[w] = (float)cpSrcRow[w].flowy / VEC_LEN_DENOM;
 		}
 		pDestURow += uStride;
 		pDestVRow += vStride;

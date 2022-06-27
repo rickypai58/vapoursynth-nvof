@@ -37,7 +37,7 @@ struct DataCompensate
 	PtrNodeRef pFlowNode{nullptr};
 	const VSVideoInfo * cpSourceVideoInfo{nullptr};
 	int64_t delta{0};
-	uint8_t costThreshold{255};
+	float costThreshold{1.0f};
 };
 
 //==============================================================================
@@ -83,7 +83,7 @@ void VS_CC createCompensate(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserD
 	const VSFormat * cpFlowFormat = cpFlowInfo->format;
 
 	acceptableFormat = isConstantFormat(cpFlowInfo) &&
-		(cpFlowFormat == a_cpVSAPI->getFormatPreset(pfYUV444P16, a_pCore));
+		(cpFlowFormat == a_cpVSAPI->getFormatPreset(pfYUV444PS, a_pCore));
 	if(!acceptableFormat)
 	{
 		a_cpVSAPI->setError(a_pOut, "nvof.Compensate: "
@@ -116,16 +116,16 @@ void VS_CC createCompensate(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserD
 	//--------------------------------------------------------------------------
 	// cost_threshold
 	
-	int64_t tempCostThreshold = a_cpVSAPI->propGetInt(a_pIn, "cost_threshold", 0, &error);
+	double tempCostThreshold = a_cpVSAPI->propGetFloat(a_pIn, "cost_threshold", 0, &error);
 	if(error == 0)
 	{
-		if((tempCostThreshold < 0) || (tempCostThreshold > 255))
+		if((tempCostThreshold < 0) || (tempCostThreshold > 1.0))
 		{
 			a_cpVSAPI->setError(a_pOut, "nvof.Compensate: "
-				"cost_threshold is out of bounds (0 to 255).");
+				"cost_threshold is out of bounds (0 to 1).");
 			return;
 		}
-		internalData.costThreshold = (uint8_t)tempCostThreshold;
+		internalData.costThreshold = (float)tempCostThreshold;
 	}
 
 	//--------------------------------------------------------------------------
@@ -167,12 +167,12 @@ template<typename T>
 void compensatePlane(int a_plane, const VSFrameRef * a_cpCurrentFrame,
 	const VSFrameRef * a_cpDeltaFrame, const VSFrameRef * a_cpFlowFrame,
 	VSFrameRef * a_pOutFrame, const VSFormat * a_cpSourceFormat,
-	uint8_t a_costThreshold, const VSAPI * a_cpVSAPI)
+	float a_costThreshold, const VSAPI * a_cpVSAPI)
 {
 	int divW = (a_plane == 0) ? 1 : 1 << a_cpSourceFormat->subSamplingW;
 	int divH = (a_plane == 0) ? 1 : 1 << a_cpSourceFormat->subSamplingH;
-	double divVecW = double(1 << 5) * double(divW);
-	double divVecH = double(1 << 5) * double(divH);
+	double divVecW = double(divW);
+	double divVecH = double(divH);
 
 	int width = a_cpVSAPI->getFrameWidth(a_cpCurrentFrame, a_plane);
 	int height = a_cpVSAPI->getFrameHeight(a_cpCurrentFrame, a_plane);
@@ -181,9 +181,9 @@ void compensatePlane(int a_plane, const VSFrameRef * a_cpCurrentFrame,
 	const uint8_t * cpDeltaPlane = a_cpVSAPI->getReadPtr(a_cpDeltaFrame, a_plane);
 	int sourceStride = a_cpVSAPI->getStride(a_cpCurrentFrame, a_plane);
 
-	const uint8_t * cpFlowUPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, 0);
-	const uint8_t * cpFlowVPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, 1);
-	const uint8_t * cpFlowCostPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, 2);
+	const uint8_t * cpFlowCostPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, 0);
+	const uint8_t * cpFlowUPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, 1);
+	const uint8_t * cpFlowVPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, 2);
 	int flowStride = a_cpVSAPI->getStride(a_cpFlowFrame, 0);
 
 	const uint8_t * cpSrcRow = cpCurrentPlane;
@@ -193,15 +193,15 @@ void compensatePlane(int a_plane, const VSFrameRef * a_cpCurrentFrame,
 	for(int h = 0; h < height; ++h)
 	{
 		const ptrdiff_t flowRowShift = (ptrdiff_t)h * divH * flowStride;
-		const int16_t * pFlowURow = (const int16_t *)(cpFlowUPlane + flowRowShift);
-		const int16_t * pFlowVRow = (const int16_t *)(cpFlowVPlane + flowRowShift);
-		const uint8_t * pFlowCostRow = (const uint8_t *)(cpFlowCostPlane + flowRowShift);
+		const float * pFlowURow = (const float *)(cpFlowUPlane + flowRowShift);
+		const float * pFlowVRow = (const float *)(cpFlowVPlane + flowRowShift);
+		const float * pFlowCostRow = (const float *)(cpFlowCostPlane + flowRowShift);
 
 		const T * cpSrcTypedRow = (const T *)cpSrcRow;
 		T * pDstTypedRow = (T *)pDstRow;
 		for(int w = 0; w < width; ++w)
 		{
-			uint8_t cost = pFlowCostRow[w * divW * 2];
+			float cost = pFlowCostRow[w * divW];
 			double vecX = (double)pFlowURow[w * divW] / divVecW;
 			double vecY = (double)pFlowVRow[w * divW] / divVecH;
 			double x = (double)w + vecX;

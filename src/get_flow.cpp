@@ -169,8 +169,7 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 	// output video info
 
 	internalData.videoInfo = *internalData.cpSourceVideoInfo;
-	internalData.videoInfo.format = a_cpVSAPI->registerFormat(
-		cmYUV, stInteger, 16, 0, 0, a_pCore);
+	internalData.videoInfo.format = a_cpVSAPI->getFormatPreset(pfYUV444PS, a_pCore);
 
 	//--------------------------------------------------------------------------
 

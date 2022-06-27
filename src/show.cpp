@@ -32,21 +32,21 @@
 const double pi = 3.14159265358979323846;
 
 struct RGB{
-	double r;       // Å∏ [0, 1]
-	double g;       // Å∏ [0, 1]
-	double b;       // Å∏ [0, 1]
+	double r;       // ÔøΩÔøΩ [0, 1]
+	double g;       // ÔøΩÔøΩ [0, 1]
+	double b;       // ÔøΩÔøΩ [0, 1]
 };
 
 struct RGB8{
-	uint8_t r;       // Å∏ [0, 255]
-	uint8_t g;       // Å∏ [0, 255]
-	uint8_t b;       // Å∏ [0, 255]
+	uint8_t r;       // ÔøΩÔøΩ [0, 255]
+	uint8_t g;       // ÔøΩÔøΩ [0, 255]
+	uint8_t b;       // ÔøΩÔøΩ [0, 255]
 };
 
 struct HSV{
-	double h;       // Å∏ [0, 2 * pi]
-	double s;       // Å∏ [0, 1]
-	double v;       // Å∏ [0, 1]
+	double h;       // ÔøΩÔøΩ [0, 2 * pi]
+	double s;       // ÔøΩÔøΩ [0, 1]
+	double v;       // ÔøΩÔøΩ [0, 1]
 };
 
 RGB hsv2rgb(HSV hsv)
@@ -86,15 +86,12 @@ RGB hsv2rgb(HSV hsv)
 	return rgb;
 }
 
-RGB8 fromUV(int16_t u16, int16_t v16, double amplify = 1.)
+RGB8 fromUV(float u, float v, double amplify = 1.)
 {
-	const double maxLen = 1024. * sqrt(2.);
-
-	double u = (double)u16 / (1 << 5);
-	double v = (double)v16 / (1 << 5);
+	const double VEC_MAX_LEN = 1024. * sqrt(2.);
 
 	double h = atan2(-v, u);
-	double s = sqrt(u * u + v * v) / maxLen * amplify;
+	double s = sqrt(u * u + v * v) / VEC_MAX_LEN * amplify;
 	s = clamp(s, 0., 1.);
 
 	RGB rgb = hsv2rgb({h, s, 1.0});
@@ -159,7 +156,7 @@ void VS_CC createShow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData,
 
 	bool acceptableFormat = isConstantFormat(internalData.cpSourceVideoInfo) &&
 		(internalData.cpSourceVideoInfo->numFrames != 0) && 
-		(cpFormat == a_cpVSAPI->getFormatPreset(pfYUV444P16, a_pCore));
+		(cpFormat == a_cpVSAPI->getFormatPreset(pfYUV444PS, a_pCore));
 	if(!acceptableFormat)
 	{
 		a_cpVSAPI->setError(a_pOut, "nvof.show: "
@@ -203,7 +200,7 @@ void VS_CC createShow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData,
 
 	static std::map<ShowMode, const VSFormat *> formats{
 		{ShowMode::Flow, a_cpVSAPI->getFormatPreset(pfRGB24, a_pCore)},
-		{ShowMode::Cost, a_cpVSAPI->getFormatPreset(pfGray8, a_pCore)},
+		{ShowMode::Cost, a_cpVSAPI->getFormatPreset(pfGrayS, a_pCore)},
 	};
 	std::map<ShowMode, const VSFormat *>::const_iterator it =
 		formats.find(internalData.mode);
@@ -297,11 +294,11 @@ const VSFrameRef * VS_CC getFrameShow(int a_n, int a_activationReason,
 
 		for(int h = 0; h < height; ++h)
 		{
-			const int16_t * cpSrcU16Row = (const int16_t *)cpSrcURow;
-			const int16_t * cpSrcV16Row = (const int16_t *)cpSrcVRow;
+			const float * cpSrcUFloatRow = (const float *)cpSrcURow;
+			const float * cpSrcVFloatRow = (const float *)cpSrcVRow;
 			for(int w = 0; w < width; ++w)
 			{
-				RGB8 rgb = fromUV(cpSrcU16Row[w], cpSrcV16Row[w], pInternalData->amplify);
+				RGB8 rgb = fromUV(cpSrcUFloatRow[w], cpSrcVFloatRow[w], pInternalData->amplify);
 				pDstRRow[w] = rgb.r;
 				pDstGRow[w] = rgb.g;
 				pDstBRow[w] = rgb.b;
@@ -323,10 +320,12 @@ const VSFrameRef * VS_CC getFrameShow(int a_n, int a_activationReason,
 
 		for(int h = 0; h < height; ++h)
 		{
+			const float * pFloatSrcRow = (const float *)cpSrcRow;
+			float * pFloatDstRow = (float *)pDstRow;
 			for(int w = 0; w < width; ++w)
 			{
-				double cost = double(cpSrcRow[w * 2]) * pInternalData->amplify;
-				pDstRow[w] = (uint8_t)clamp(cost, 0., 255.);
+				float cost = pFloatSrcRow[w] * pInternalData->amplify;
+				pFloatDstRow[w] = clamp(cost, 0.f, 1.0f);
 			}
 			cpSrcRow += srcStride;
 			pDstRow += dstStride;
