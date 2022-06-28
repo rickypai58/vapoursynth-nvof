@@ -177,10 +177,10 @@ void compensatePlane(int a_plane, const VSFrameRef * a_cpCurrentFrame,
 	VSFrameRef * a_pOutFrame, const VSFormat * a_cpSourceFormat,
 	float a_costThreshold, const VSAPI * a_cpVSAPI)
 {
-	int divW = (a_plane == 0) ? 1 : 1 << a_cpSourceFormat->subSamplingW;
-	int divH = (a_plane == 0) ? 1 : 1 << a_cpSourceFormat->subSamplingH;
-	double divVecW = double(divW);
-	double divVecH = double(divH);
+	int divW = (a_plane == 0) ? 1 : (1 << a_cpSourceFormat->subSamplingW);
+	int divH = (a_plane == 0) ? 1 : (1 << a_cpSourceFormat->subSamplingH);
+	double divVecX = double(divW);
+	double divVecY = double(divH);
 
 	int width = a_cpVSAPI->getFrameWidth(a_cpCurrentFrame, a_plane);
 	int height = a_cpVSAPI->getFrameHeight(a_cpCurrentFrame, a_plane);
@@ -189,10 +189,11 @@ void compensatePlane(int a_plane, const VSFrameRef * a_cpCurrentFrame,
 	const uint8_t * cpDeltaPlane = a_cpVSAPI->getReadPtr(a_cpDeltaFrame, a_plane);
 	int sourceStride = a_cpVSAPI->getStride(a_cpCurrentFrame, a_plane);
 
-	const uint8_t * cpFlowCostPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, 0);
-	const uint8_t * cpFlowUPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, 1);
-	const uint8_t * cpFlowVPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, 2);
-	int flowStride = a_cpVSAPI->getStride(a_cpFlowFrame, 0);
+	const uint8_t * cpCostPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, PLANE_COST);
+	const uint8_t * cpVecXPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, PLANE_VEC_X);
+	const uint8_t * cpVecYPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, PLANE_VEC_Y);
+	// Stride should be the same for all flow planes.
+	int flowStride = a_cpVSAPI->getStride(a_cpFlowFrame, PLANE_COST);
 
 	const uint8_t * cpSrcRow = cpCurrentPlane;
 	uint8_t * pDstRow = a_cpVSAPI->getWritePtr(a_pOutFrame, a_plane);
@@ -201,17 +202,17 @@ void compensatePlane(int a_plane, const VSFrameRef * a_cpCurrentFrame,
 	for(int h = 0; h < height; ++h)
 	{
 		const ptrdiff_t flowRowShift = (ptrdiff_t)h * divH * flowStride;
-		const float * pFlowURow = (const float *)(cpFlowUPlane + flowRowShift);
-		const float * pFlowVRow = (const float *)(cpFlowVPlane + flowRowShift);
-		const float * pFlowCostRow = (const float *)(cpFlowCostPlane + flowRowShift);
+		const float * cpCostRow = (const float *)(cpCostPlane + flowRowShift);
+		const float * cpVecXRow = (const float *)(cpVecXPlane + flowRowShift);
+		const float * cpVecYRow = (const float *)(cpVecYPlane + flowRowShift);
 
 		const T * cpSrcTypedRow = (const T *)cpSrcRow;
 		T * pDstTypedRow = (T *)pDstRow;
 		for(int w = 0; w < width; ++w)
 		{
-			float cost = pFlowCostRow[w * divW];
-			double vecX = (double)pFlowURow[w * divW] / divVecW;
-			double vecY = (double)pFlowVRow[w * divW] / divVecH;
+			float cost = cpCostRow[w * divW];
+			double vecX = (double)cpVecXRow[w * divW] / divVecX;
+			double vecY = (double)cpVecYRow[w * divW] / divVecY;
 			double x = (double)w + vecX;
 			double y = (double)h + vecY;
 

@@ -86,12 +86,12 @@ RGB hsv2rgb(HSV hsv)
 	return rgb;
 }
 
-RGB8 fromUV(float u, float v, double amplify = 1.)
+RGB8 vecToRGB(float x, float y, double amplify = 1.)
 {
 	const double VEC_MAX_LEN = 1024. * sqrt(2.);
 
-	double h = atan2(-v, u);
-	double s = sqrt(u * u + v * v) / VEC_MAX_LEN * amplify;
+	double h = atan2(-y, x);
+	double s = sqrt(x * x + y * y) / VEC_MAX_LEN * amplify;
 	s = clamp(s, 0., 1.);
 
 	RGB rgb = hsv2rgb({h, s, 1.0});
@@ -280,32 +280,32 @@ const VSFrameRef * VS_CC getFrameShow(int a_n, int a_activationReason,
 
 	if(pInternalData->mode == ShowMode::Flow)
 	{
-		int srcUStride = a_cpVSAPI->getStride(cpFlowFrame, 1);
-		const uint8_t * cpSrcURow = a_cpVSAPI->getReadPtr(cpFlowFrame, 1);
-		int srcVStride = a_cpVSAPI->getStride(cpFlowFrame, 2);
-		const uint8_t * cpSrcVRow = a_cpVSAPI->getReadPtr(cpFlowFrame, 2);
+		int vecXStride = a_cpVSAPI->getStride(cpFlowFrame, PLANE_VEC_X);
+		const uint8_t * cpVecXRow = a_cpVSAPI->getReadPtr(cpFlowFrame, PLANE_VEC_X);
+		int vecYStride = a_cpVSAPI->getStride(cpFlowFrame, PLANE_VEC_Y);
+		const uint8_t * cpVecYRow = a_cpVSAPI->getReadPtr(cpFlowFrame, PLANE_VEC_Y);
 
-		int dstRStride = a_cpVSAPI->getStride(pOutFrame, 0);
-		uint8_t * pDstRRow = a_cpVSAPI->getWritePtr(pOutFrame, 0);
-		int dstGStride = a_cpVSAPI->getStride(pOutFrame, 1);
-		uint8_t * pDstGRow = a_cpVSAPI->getWritePtr(pOutFrame, 1);
-		int dstBStride = a_cpVSAPI->getStride(pOutFrame, 2);
-		uint8_t * pDstBRow = a_cpVSAPI->getWritePtr(pOutFrame, 2);
+		int dstRStride = a_cpVSAPI->getStride(pOutFrame, PLANE_R);
+		uint8_t * pDstRRow = a_cpVSAPI->getWritePtr(pOutFrame, PLANE_R);
+		int dstGStride = a_cpVSAPI->getStride(pOutFrame, PLANE_G);
+		uint8_t * pDstGRow = a_cpVSAPI->getWritePtr(pOutFrame, PLANE_G);
+		int dstBStride = a_cpVSAPI->getStride(pOutFrame, PLANE_B);
+		uint8_t * pDstBRow = a_cpVSAPI->getWritePtr(pOutFrame, PLANE_B);
 
 		for(int h = 0; h < height; ++h)
 		{
-			const float * cpSrcUFloatRow = (const float *)cpSrcURow;
-			const float * cpSrcVFloatRow = (const float *)cpSrcVRow;
+			const float * cpVecXFloatRow = (const float *)cpVecXRow;
+			const float * cpVecYFloatRow = (const float *)cpVecYRow;
 			for(int w = 0; w < width; ++w)
 			{
-				RGB8 rgb = fromUV(cpSrcUFloatRow[w], cpSrcVFloatRow[w], pInternalData->amplify);
+				RGB8 rgb = vecToRGB(cpVecXFloatRow[w], cpVecYFloatRow[w], pInternalData->amplify);
 				pDstRRow[w] = rgb.r;
 				pDstGRow[w] = rgb.g;
 				pDstBRow[w] = rgb.b;
 			}
 			
-			cpSrcURow += srcUStride;
-			cpSrcVRow += srcVStride;
+			cpVecXRow += vecXStride;
+			cpVecYRow += vecYStride;
 			pDstRRow += dstRStride;
 			pDstGRow += dstGStride;
 			pDstBRow += dstBStride;
@@ -313,10 +313,10 @@ const VSFrameRef * VS_CC getFrameShow(int a_n, int a_activationReason,
 	}
 	else if(pInternalData->mode == ShowMode::Cost)
 	{
-		int srcStride = a_cpVSAPI->getStride(cpFlowFrame, 0);
-		const uint8_t * cpSrcRow = a_cpVSAPI->getReadPtr(cpFlowFrame, 0);
-		int dstStride = a_cpVSAPI->getStride(pOutFrame, 0);
-		uint8_t * pDstRow = a_cpVSAPI->getWritePtr(pOutFrame, 0);
+		int srcStride = a_cpVSAPI->getStride(cpFlowFrame, PLANE_COST);
+		const uint8_t * cpSrcRow = a_cpVSAPI->getReadPtr(cpFlowFrame, PLANE_COST);
+		int dstStride = a_cpVSAPI->getStride(pOutFrame, PLANE_Y);
+		uint8_t * pDstRow = a_cpVSAPI->getWritePtr(pOutFrame, PLANE_Y);
 
 		for(int h = 0; h < height; ++h)
 		{

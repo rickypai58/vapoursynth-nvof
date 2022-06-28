@@ -47,6 +47,20 @@
 
 //==============================================================================
 
+static const int PLANE_COST = 0;
+static const int PLANE_VEC_X = 1;
+static const int PLANE_VEC_Y = 2;
+
+static const int PLANE_Y = 0;
+static const int PLANE_U = 1;
+static const int PLANE_V = 2;
+
+static const int PLANE_R = 0;
+static const int PLANE_G = 1;
+static const int PLANE_B = 2;
+
+//==============================================================================
+
 #pragma pack(push, 1)
 struct RGBA32
 {
