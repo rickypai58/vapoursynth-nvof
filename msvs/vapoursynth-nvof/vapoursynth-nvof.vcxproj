@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\compensate.cpp" />
+    <ClCompile Include="..\..\src\confidence.cpp" />
     <ClCompile Include="..\..\src\get_flow.cpp" />
     <ClCompile Include="..\..\src\main.cpp" />
     <ClCompile Include="..\..\src\nvidia-optical-flow-api.cpp" />
