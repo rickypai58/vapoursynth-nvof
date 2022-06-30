@@ -291,8 +291,8 @@ const VSFrameRef * VS_CC getFrameCorrelation(int a_n, int a_activationReason,
 		PlaneWithCorrelation plane;
 		plane.width = a_cpVSAPI->getFrameWidth(cpSourceFrame, planeNumber);
 		plane.height = a_cpVSAPI->getFrameHeight(cpSourceFrame, planeNumber);
-		plane.subSamplingW = (planeNumber == 0) ? 1 : cpFormat->subSamplingW;
-		plane.subSamplingH = (planeNumber == 0) ? 1 : cpFormat->subSamplingH;
+		plane.subSamplingW = (planeNumber == 0) ? 0 : cpFormat->subSamplingW;
+		plane.subSamplingH = (planeNumber == 0) ? 0 : cpFormat->subSamplingH;
 		plane.cpSourceBytes = a_cpVSAPI->getReadPtr(cpSourceFrame, planeNumber);
 		plane.sourceStride = a_cpVSAPI->getStride(cpSourceFrame, planeNumber);
 		plane.cpCompensatedBytes = a_cpVSAPI->getReadPtr(cpCompensatedFrame, planeNumber);
