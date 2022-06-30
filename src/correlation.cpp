@@ -164,55 +164,53 @@ float calculateBlockCorrelation(const ConstSampler2D<T> & a_sampler1,
 {
 	int blockSize = (a_hMax - a_hMin + 1) * (a_wMax - a_wMin + 1);
 
-	float mean1 = 0.0f;
-	float mean2 = 0.0f;
+	std::vector<double> block1(blockSize, 0.0);
+	std::vector<double> block2(blockSize, 0.0);
 
+	double mean1 = 0.0;
+	double mean2 = 0.0;
+
+	size_t i = 0;
 	for(int h = a_hMin; h <= a_hMax; ++h)
 	{
 		for(int w = a_wMin; w < a_wMax; ++w)
 		{
-			mean1 += (float)a_sampler1[h][w];
-			mean2 += (float)a_sampler2[h][w];
+			double value1(a_sampler1[h][w]);
+			double value2(a_sampler2[h][w]);
+			block1[i] = value1;
+			block2[i] = value2;
+			mean1 += value1;
+			mean2 += value2;
+			i++;
 		}
 	}
 
 	mean1 /= blockSize;
 	mean2 /= blockSize;
 
-	std::vector<float> block1(blockSize, 0.0f);
-	std::vector<float> block2(blockSize, 0.0f);
+	double correlation = 0.0;
 
-	float * pValue1 = block1.data();
-	float * pValue2 = block2.data();
-
-	for(int h = a_hMin; h <= a_hMax; ++h)
+	for(i = 0; i < blockSize; ++i)
 	{
-		for(int w = a_wMin; w < a_wMax; ++w)
-		{
-			*pValue1 = (float)a_sampler1[h][w] - mean1;
-			*pValue2 = (float)a_sampler2[h][w] - mean2;
-			pValue1++;
-			pValue2++;
-		}
-	}
+		static const double EPSILON = 1.E-20;
 
-	float correlation = 0.0f;
+		double value1 = block1[i] - mean1;
+		double value2 = block2[i] - mean2;
 
-	for(size_t i = 0; i < blockSize; ++i)
-	{
-		if((block1[i] == 0.0f) && (block2[i] == 0.0f))
+		if((std::abs(value1) < EPSILON) && (std::abs(value2) < EPSILON))
 		{
-			correlation += 1.0f;
+			correlation += 1.0;
 			continue;
 		}
 
-		float denom = std::max(std::abs(block1[i]), std::abs(block2[i]));
-		correlation += block1[i] * block2[i] / denom / denom;
+		double denom = std::max(std::abs(value1), std::abs(value2));
+		correlation += value1 * value2 / denom / denom;
 	}
 
 	correlation /= blockSize;
+	correlation = clamp(correlation, 0.0, 1.0);
 
-	return correlation;
+	return (float)correlation;
 }
 
 //==============================================================================
@@ -238,7 +236,7 @@ void calculatePlaneCorelation(PlaneWithCorrelation & a_plane, int a_radius)
 			int wMin = std::max(w - radX, 0);
 			int wMax = std::min(w + radX, a_plane.width - 1);
 
-			*pCorrelation = calculateBlockCorrelation(samplerSource, samplerCompensated,
+			*pCorrelation = calculateBlockCorrelation<T>(samplerSource, samplerCompensated,
 				hMin, hMax, wMin, wMax);
 			pCorrelation++;
 		}
@@ -257,6 +255,7 @@ const VSFrameRef * VS_CC getFrameCorrelation(int a_n, int a_activationReason,
 	int framesNumber = pInternalData->cpSourceVideoInfo->numFrames;
 	int width = pInternalData->cpSourceVideoInfo->width;
 	int height = pInternalData->cpSourceVideoInfo->height;
+	const VSFormat * cpSourceFormat = pInternalData->cpSourceVideoInfo->format;
 
 	a_n = clamp(a_n, 0, framesNumber - 1);
 
@@ -305,16 +304,16 @@ const VSFrameRef * VS_CC getFrameCorrelation(int a_n, int a_activationReason,
 			calculatePlaneCorelation<T>(plane, pInternalData->radius);
 		};
 
-		if(cpFormat->sampleType == stFloat)
+		if(cpSourceFormat->sampleType == stFloat)
 		{
-			if(cpFormat->bytesPerSample == 4)
+			if(cpSourceFormat->bytesPerSample == 4)
 				calculatePlaneCorrelationType(float());
 			else
 				assert(false);
 		}
 		else
 		{
-			switch(cpFormat->bytesPerSample)
+			switch(cpSourceFormat->bytesPerSample)
 			{
 			case 1: calculatePlaneCorrelationType(uint8_t()); break;
 			case 2: calculatePlaneCorrelationType(uint16_t()); break;
