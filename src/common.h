@@ -131,4 +131,18 @@ T clamp(const T & a_value, const T2 & a_minBound, const T3 & a_maxBound)
 
 //==============================================================================
 
+template<typename T>
+struct Sampler2D
+{
+	const uint8_t * pData{nullptr};
+	ptrdiff_t stride{0};
+
+	const T * operator[](size_t a_row) const
+	{
+		return (const T *)(pData + stride * a_row);
+	}
+};
+
+//==============================================================================
+
 #endif

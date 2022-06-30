@@ -34,7 +34,7 @@ void VS_CC createShow(const VSMap * a_pIn, VSMap * a_pOut,
 void VS_CC createCompensate(const VSMap * a_pIn, VSMap * a_pOut,
 	void * a_pUserData, VSCore * a_pCore, const VSAPI * a_pVSAPI);
 
-void VS_CC createConfidence(const VSMap * a_pIn, VSMap * a_pOut,
+void VS_CC createCorrelation(const VSMap * a_pIn, VSMap * a_pOut,
 	void * a_pUserData, VSCore * a_pCore, const VSAPI * a_pVSAPI);
 
 //==============================================================================
@@ -67,11 +67,11 @@ VS_EXTERNAL_API(void) VapourSynthPluginInit(VSConfigPlugin a_configFunc,
 		"cost_threshold:float:opt;"
 		, createCompensate, nullptr, a_pPlugin);
 
-	a_registerFunc("confidence",
+	a_registerFunc("correlation",
 		"clip:clip;"
 		"compensated:clip;"
 		"radius:int:opt;"
-		, createConfidence, nullptr, a_pPlugin);
+		, createCorrelation, nullptr, a_pPlugin);
 }
 
 //==============================================================================
