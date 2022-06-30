@@ -159,8 +159,8 @@ void VS_CC freeCorrelation(void * a_pInstanceData, VSCore * a_pCore,
 //==============================================================================
 
 template<typename T>
-float calculateBlockCorrelation(const Sampler2D<T> & a_sampler1,
-	const Sampler2D<T> & a_sampler2, int a_hMin, int a_hMax, int a_wMin, int a_wMax)
+float calculateBlockCorrelation(const ConstSampler2D<T> & a_sampler1,
+	const ConstSampler2D<T> & a_sampler2, int a_hMin, int a_hMax, int a_wMin, int a_wMax)
 {
 	int blockSize = (a_hMax - a_hMin + 1) * (a_wMax - a_wMin + 1);
 
@@ -200,6 +200,12 @@ float calculateBlockCorrelation(const Sampler2D<T> & a_sampler1,
 
 	for(size_t i = 0; i < blockSize; ++i)
 	{
+		if((block1[i] == 0.0f) && (block2[i] == 0.0f))
+		{
+			correlation += 1.0f;
+			continue;
+		}
+
 		float denom = std::max(std::abs(block1[i]), std::abs(block2[i]));
 		correlation += block1[i] * block2[i] / denom / denom;
 	}
@@ -217,16 +223,15 @@ void calculatePlaneCorelation(PlaneWithCorrelation & a_plane, int a_radius)
 	int radX = a_radius >> a_plane.subSamplingW;
 	int radY = a_radius >> a_plane.subSamplingH;
 	
-	Sampler2D<T> samplerSource{a_plane.cpSourceBytes, a_plane.sourceStride};
-	Sampler2D<T> samplerCompensated{a_plane.cpCompensatedBytes, a_plane.compensatedStride};
+	ConstSampler2D<T> samplerSource{a_plane.cpSourceBytes, a_plane.sourceStride};
+	ConstSampler2D<T> samplerCompensated{a_plane.cpCompensatedBytes, a_plane.compensatedStride};
 
 	float * pCorrelation = a_plane.correlation.data();
 
-	for(int h = 0; h < a_plane.width; ++h)
+	for(int h = 0; h < a_plane.height; ++h)
 	{
 		int hMin = std::max(h - radY, 0);
 		int hMax = std::min(h + radY, a_plane.height - 1);
-		int blockHeight = hMax - hMin + 1;
 
 		for(int w = 0; w < a_plane.width; ++w)
 		{
@@ -265,7 +270,7 @@ const VSFrameRef * VS_CC getFrameCorrelation(int a_n, int a_activationReason,
 		return nullptr;
 
 	const VSFormat * cpFormat = pInternalData->videoInfo.format;
-	size_t planesNumber = cpFormat->numPlanes;
+	size_t planesCount = cpFormat->numPlanes;
 
 	const VSFrameRef * cpSourceFrame = a_cpVSAPI->getFrameFilter(a_n,
 		pInternalData->pInputNode.get(), a_pFrameCtx);
@@ -275,9 +280,13 @@ const VSFrameRef * VS_CC getFrameCorrelation(int a_n, int a_activationReason,
 	VSFrameRef * pOutFrame = a_cpVSAPI->newVideoFrame(cpFormat, width, height,
 		nullptr, a_pCore);
 
-	std::vector<PlaneWithCorrelation> planes(planesNumber);
+	uint8_t * pOutData = a_cpVSAPI->getWritePtr(pOutFrame, 0);
+	int outStride = a_cpVSAPI->getStride(pOutFrame, 0);
+	memset(pOutData, 0, (size_t)outStride * height);
 
-	for(int planeNumber = 0; planeNumber < planesNumber; ++planeNumber)
+	Sampler2D<float> correlationSampler{pOutData, outStride};
+
+	for(int planeNumber = 0; planeNumber < planesCount; ++planeNumber)
 	{
 		PlaneWithCorrelation plane;
 		plane.width = a_cpVSAPI->getFrameWidth(cpSourceFrame, planeNumber);
@@ -314,7 +323,14 @@ const VSFrameRef * VS_CC getFrameCorrelation(int a_n, int a_activationReason,
 			}
 		}
 
-		planes[planeNumber] = std::move(plane);
+		ConstSampler2D<float> planeCorrSampler{plane.correlation.data(), plane.width * sizeof(float)};
+
+		int subW = plane.subSamplingW;
+		int subH = plane.subSamplingH;
+
+		for(int h = 0; h < height; ++h)
+			for(int w = 0; w < width; ++w)
+				correlationSampler[h][w] += planeCorrSampler[h >> subH][w >> subW] / (float)planesCount;
 	}
 
 	a_cpVSAPI->freeFrame(cpSourceFrame);

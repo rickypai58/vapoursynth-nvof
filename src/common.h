@@ -132,14 +132,26 @@ T clamp(const T & a_value, const T2 & a_minBound, const T3 & a_maxBound)
 //==============================================================================
 
 template<typename T>
-struct Sampler2D
+struct ConstSampler2D
 {
-	const uint8_t * pData{nullptr};
+	const void * pData{nullptr};
 	ptrdiff_t stride{0};
 
 	const T * operator[](size_t a_row) const
 	{
-		return (const T *)(pData + stride * a_row);
+		return (const T *)((const uint8_t *)pData + stride * a_row);
+	}
+};
+
+template<typename T>
+struct Sampler2D
+{
+	void * pData{nullptr};
+	ptrdiff_t stride{0};
+
+	T * operator[](size_t a_row) const
+	{
+		return (T *)((uint8_t *)pData + stride * a_row);
 	}
 };
 
