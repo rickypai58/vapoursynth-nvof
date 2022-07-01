@@ -64,7 +64,6 @@ VS_EXTERNAL_API(void) VapourSynthPluginInit(VSConfigPlugin a_configFunc,
 		"clip:clip;"
 		"flow:clip;"
 		"delta:int;"
-		"cost_threshold:float:opt;"
 		, createCompensate, nullptr, a_pPlugin);
 
 	a_registerFunc("correlation",

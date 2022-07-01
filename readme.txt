@@ -34,7 +34,6 @@ nvof.compensate(clip clip, clip flow, int delta [, int cost_threshold = 1.0])
 	clip: The clip to motion-compensate. Can be of any planar format, except half precision float formats.
 	flow: The optical flow clip. Must have the same size with clip.
 	delta: The step between the frames. Should be the same as used for the flow calculation. Filter makes no effort to ensure that.
-	cost_threshold: Cost function threshold. The vector for pixel is discarded if the cost function value for that pixel is equal or higher than that threshold. Original pixel values are used instead.
 
 Motion compensation filter.
 Output format matches the clip format. Replaces the current frame pixels with the values from where they moved in the second frame, according to the motion vector. For fractional vectors bilinear sampling is used.

@@ -37,7 +37,6 @@ struct DataCompensate
 	PtrNodeRef pFlowNode{nullptr};
 	const VSVideoInfo * cpSourceVideoInfo{nullptr};
 	int64_t delta{0};
-	float costThreshold{1.0f};
 };
 
 //==============================================================================
@@ -122,21 +121,6 @@ void VS_CC createCompensate(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserD
 	}
 
 	//--------------------------------------------------------------------------
-	// cost_threshold
-	
-	double tempCostThreshold = a_cpVSAPI->propGetFloat(a_pIn, "cost_threshold", 0, &error);
-	if(error == 0)
-	{
-		if((tempCostThreshold < 0) || (tempCostThreshold > 1.0))
-		{
-			a_cpVSAPI->setError(a_pOut, "nvof.Compensate: "
-				"cost_threshold is out of bounds (0 to 1).");
-			return;
-		}
-		internalData.costThreshold = (float)tempCostThreshold;
-	}
-
-	//--------------------------------------------------------------------------
 
 	DataCompensate * pInternalData = new DataCompensate;
 	*pInternalData = std::move(internalData);
@@ -175,7 +159,7 @@ template<typename T>
 void compensatePlane(int a_plane, const VSFrameRef * a_cpCurrentFrame,
 	const VSFrameRef * a_cpDeltaFrame, const VSFrameRef * a_cpFlowFrame,
 	VSFrameRef * a_pOutFrame, const VSFormat * a_cpSourceFormat,
-	float a_costThreshold, const VSAPI * a_cpVSAPI)
+	const VSAPI * a_cpVSAPI)
 {
 	int divW = (a_plane == 0) ? 1 : (1 << a_cpSourceFormat->subSamplingW);
 	int divH = (a_plane == 0) ? 1 : (1 << a_cpSourceFormat->subSamplingH);
@@ -189,7 +173,6 @@ void compensatePlane(int a_plane, const VSFrameRef * a_cpCurrentFrame,
 	const uint8_t * cpDeltaPlane = a_cpVSAPI->getReadPtr(a_cpDeltaFrame, a_plane);
 	int sourceStride = a_cpVSAPI->getStride(a_cpCurrentFrame, a_plane);
 
-	const uint8_t * cpCostPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, PLANE_COST);
 	const uint8_t * cpVecXPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, PLANE_VEC_X);
 	const uint8_t * cpVecYPlane = a_cpVSAPI->getReadPtr(a_cpFlowFrame, PLANE_VEC_Y);
 	// Stride should be the same for all flow planes.
@@ -202,7 +185,6 @@ void compensatePlane(int a_plane, const VSFrameRef * a_cpCurrentFrame,
 	for(int h = 0; h < height; ++h)
 	{
 		const ptrdiff_t flowRowShift = (ptrdiff_t)h * divH * flowStride;
-		const float * cpCostRow = (const float *)(cpCostPlane + flowRowShift);
 		const float * cpVecXRow = (const float *)(cpVecXPlane + flowRowShift);
 		const float * cpVecYRow = (const float *)(cpVecYPlane + flowRowShift);
 
@@ -210,13 +192,12 @@ void compensatePlane(int a_plane, const VSFrameRef * a_cpCurrentFrame,
 		T * pDstTypedRow = (T *)pDstRow;
 		for(int w = 0; w < width; ++w)
 		{
-			float cost = cpCostRow[w * divW];
 			double vecX = (double)cpVecXRow[w * divW] / divVecX;
 			double vecY = (double)cpVecYRow[w * divW] / divVecY;
 			double x = (double)w + vecX;
 			double y = (double)h + vecY;
 
-			bool discard = (cost >= a_costThreshold) || (x < 0) || (x > (width - 1)) ||
+			bool discard = (x < 0) || (x > (width - 1)) ||
 				(y < 0) || (y > (height - 1));
 
 			if(discard)
@@ -286,8 +267,7 @@ const VSFrameRef * VS_CC getFrameCompensate(int a_n, int a_activationReason,
 		{
 			using T = std::decay_t<decltype(arg)>;
 			compensatePlane<T>(plane, cpCurrentFrame, cpDeltaFrame,
-				cpFlowFrame, pOutFrame, cpSourceFormat,
-				pInternalData->costThreshold, a_cpVSAPI);
+				cpFlowFrame, pOutFrame, cpSourceFormat, a_cpVSAPI);
 		};
 
 		if(cpSourceFormat->sampleType == stFloat)
