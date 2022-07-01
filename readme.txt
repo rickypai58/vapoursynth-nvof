@@ -11,11 +11,12 @@ Filters:
 
 --------------------------------------------------------------------------------
 
-nvof.getFlow(clip clip, int delta [, bool chromaMotion = True, int speed = 0, int gpu = 0])
+nvof.getFlow(clip clip, int delta [, bool chromaMotion = True, int speed = 0, getCost=True, int gpu = 0])
 	clip: The clip to calculate the flow on. Must have 8bit depth. YUV420P8 always works. Other formats with subsampling only work with chromaMotion=False.
 	delta: Step between the original and new frames. Can be negative for backwards flow.
 	chromaMotion: Boolean flag whether to use chroma for the flow estimation. Silently ignored for RGB clips.
 	speed: Speed VS quality preset. Valid values are 0 to 2, with 0 being the slowest and the best quality.
+	getCost: Boolean flag whether to request the cost field from NVOF API. Not requesting the cost field results in lower RAM and VRAM consumption.
 	gpu: The id of GPU used for the flow calculation.
 
 Flow calculation filter.

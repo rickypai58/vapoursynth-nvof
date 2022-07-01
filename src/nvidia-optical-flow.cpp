@@ -33,11 +33,12 @@
 
 NVidiaOpticalFlow::NVidiaOpticalFlow(const VSAPI * a_cpVSAPI,
 	const VSVideoInfo & a_sourceVideoInfo, bool a_chromaMotion,
-	NV_OF_PERF_LEVEL a_perfLevel, int a_gpuID):
+	NV_OF_PERF_LEVEL a_perfLevel, bool a_getCost, int a_gpuID):
 	  m_cpVSAPI(a_cpVSAPI)
 	, m_sourceVideoInfo(a_sourceVideoInfo)
 	, m_chromaMotion(a_chromaMotion)
 	, m_perfLevel(a_perfLevel)
+	, m_getCost(a_getCost)
 	, m_gpuID(a_gpuID)
 {
 	assert(m_cpVSAPI);
@@ -248,7 +249,7 @@ bool NVidiaOpticalFlow::initNVOF(std::string & a_errorString)
 	params.mode = NV_OF_MODE_OPTICALFLOW;
 	params.perfLevel = m_perfLevel;
 	params.enableExternalHints = NV_OF_FALSE;
-	params.enableOutputCost = NV_OF_TRUE;
+	params.enableOutputCost = m_getCost ? NV_OF_TRUE : NV_OF_FALSE;
 	params.hPrivData = 0;
 	params.disparityRange = NV_OF_STEREO_DISPARITY_RANGE_UNDEFINED;
 	params.enableRoi = NV_OF_FALSE;
@@ -315,6 +316,9 @@ bool NVidiaOpticalFlow::createBuffers(std::string & a_errorString)
 
 	for(const BufferInitInfo & info : buffersToInit)
 	{
+		if((info.usage == NV_OF_BUFFER_USAGE_COST) && (!m_getCost))
+			continue;
+
 		descriptor.bufferUsage = info.usage;
 		descriptor.bufferFormat = info.format;
 		NV_OF_STATUS result = NVidiaOpticalFlowAPI::getAPI()->nvOFCreateGPUBufferCuda(
@@ -537,14 +541,17 @@ void NVidiaOpticalFlow::downloadFlow(VSFrameRef * a_pFrame)
 	const int costStride = m_cpVSAPI->getStride(a_pFrame, PLANE_COST);
 	uint8_t * pDestRow = m_cpVSAPI->getWritePtr(a_pFrame, PLANE_COST);
 	ZeroMemory(pDestRow, costStride * height);
-	const uint8_t * pSrcRow = costTempBuffer.data();
-	for(size_t h = 0; h < height; ++h)
+	if(m_getCost)
 	{
-		float * pFloatRow = (float *)pDestRow;
-		for(size_t w = 0; w < width; ++w)
-			pFloatRow[w] = (float)pSrcRow[w] / COST_NORM;
-		pDestRow += costStride;
-		pSrcRow += width;
+		const uint8_t * pSrcRow = costTempBuffer.data();
+		for(size_t h = 0; h < height; ++h)
+		{
+			float * pFloatRow = (float *)pDestRow;
+			for(size_t w = 0; w < width; ++w)
+				pFloatRow[w] = (float)pSrcRow[w] / COST_NORM;
+			pDestRow += costStride;
+			pSrcRow += width;
+		}
 	}
 
 	const float VEC_LEN_DENOM = float(1 << 5);

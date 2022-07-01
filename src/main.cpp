@@ -51,6 +51,7 @@ VS_EXTERNAL_API(void) VapourSynthPluginInit(VSConfigPlugin a_configFunc,
 		"delta:int;"
 		"chromaMotion:int:opt;"
 		"speed:int:opt;"
+		"getCost:int:opt;"
 		"gpu:int:opt;"
 		, createGetFlow, nullptr, a_pPlugin);
 

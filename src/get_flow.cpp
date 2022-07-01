@@ -39,6 +39,7 @@ struct DataGetFlow
 	int64_t delta{1};
 	int64_t chromaMotion{1};
 	NV_OF_PERF_LEVEL perfLevel{NV_OF_PERF_LEVEL_UNDEFINED};
+	bool getCost{false};
 	int64_t gpu{0};
 };
 
@@ -156,6 +157,16 @@ void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut, void * a_pUserData
 	internalData.perfLevel = it->second;
 
 	//--------------------------------------------------------------------------
+	// getCost
+
+	internalData.getCost = a_cpVSAPI->propGetInt(a_pIn, "getCost", 0, &error);
+	if(error != 0)
+	{
+		internalData.getCost = false;
+		error = 0;
+	}
+
+	//--------------------------------------------------------------------------
 	// gpu
 
 	internalData.gpu = a_cpVSAPI->propGetInt(a_pIn, "gpu", 0, &error);
@@ -248,6 +259,7 @@ const VSFrameRef * VS_CC getFrameGetFlow(int a_n, int a_activationReason,
 		*pInternalData->cpSourceVideoInfo,
 		(bool)pInternalData->chromaMotion,
 		pInternalData->perfLevel,
+		pInternalData->getCost,
 		(int)pInternalData->gpu);
 
 	if(!flow.init(errorString))

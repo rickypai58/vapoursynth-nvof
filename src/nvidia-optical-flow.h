@@ -33,7 +33,7 @@ class NVidiaOpticalFlow
 public:
 	NVidiaOpticalFlow(const VSAPI * a_cpVSAPI, const VSVideoInfo & a_sourceVideoInfo,
 		bool a_chromaMotion = true, NV_OF_PERF_LEVEL a_perfLevel = NV_OF_PERF_LEVEL_SLOW,
-		int a_gpuID = 0);
+		bool a_getCost = false, int a_gpuID = 0);
 	virtual ~NVidiaOpticalFlow();
 
 	static NV_OF_BUFFER_FORMAT bufferFormat(const VSFormat * a_cpFormat, bool chromaMotion,
@@ -60,6 +60,7 @@ private:
 	VSVideoInfo m_sourceVideoInfo{};
 	bool m_chromaMotion{true};
 	NV_OF_PERF_LEVEL m_perfLevel{NV_OF_PERF_LEVEL_SLOW};
+	bool m_getCost{false};
 	int m_gpuID{0};
 	NvOFHandle m_handle{nullptr};
 	CUcontext m_context{nullptr};
