@@ -25,17 +25,10 @@
 
 #include "common.h"
 
-void VS_CC createGetFlow(const VSMap * a_pIn, VSMap * a_pOut,
-	void * a_pUserData, VSCore * a_pCore, const VSAPI * a_pVSAPI);
-
-void VS_CC createShow(const VSMap * a_pIn, VSMap * a_pOut,
-	void * a_pUserData, VSCore * a_pCore, const VSAPI * a_pVSAPI);
-
-void VS_CC createCompensate(const VSMap * a_pIn, VSMap * a_pOut,
-	void * a_pUserData, VSCore * a_pCore, const VSAPI * a_pVSAPI);
-
-void VS_CC createCorrelation(const VSMap * a_pIn, VSMap * a_pOut,
-	void * a_pUserData, VSCore * a_pCore, const VSAPI * a_pVSAPI);
+CreateVSNodeFun createGetFlow;
+CreateVSNodeFun createShow;
+CreateVSNodeFun createCompensate;
+CreateVSNodeFun createCorrelation;
 
 //==============================================================================
 

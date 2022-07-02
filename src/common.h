@@ -47,6 +47,22 @@
 
 //==============================================================================
 
+using CreateVSNodeFun = void VS_CC (const VSMap * a_pIn, VSMap * a_pOut,
+	void * a_pUserData, VSCore * a_pCore, const VSAPI * a_cpVSAPI);
+
+using InitVSNodeFun = void VS_CC (VSMap * a_pIn, VSMap * a_pOut,
+	void ** a_ppInstanceData, VSNode * a_pNode, VSCore * a_pCore,
+	const VSAPI * a_cpVSAPI);
+
+using GetFrameFun = const VSFrameRef * VS_CC (int a_n, int a_activationReason,
+	void ** a_ppInstanceData, void ** a_ppFrameData,
+	VSFrameContext * a_pFrameCtx, VSCore * a_pCore, const VSAPI * a_cpVSAPI);
+
+using FreeVSNodeFun = void VS_CC (void * a_pInstanceData, VSCore * a_pCore,
+	const VSAPI * a_cpVSAPI);
+
+//==============================================================================
+
 static const int PLANE_COST = 0;
 static const int PLANE_VEC_X = 1;
 static const int PLANE_VEC_Y = 2;

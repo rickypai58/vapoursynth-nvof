@@ -46,15 +46,9 @@ struct DataGetFlow
 //==============================================================================
 // Forward declarations
 
-void VS_CC initGetFlow(VSMap * a_pIn, VSMap * a_pOut, void ** a_ppInstanceData,
-	VSNode * a_pNode, VSCore * a_pCore, const VSAPI * a_cpVSAPI);
-
-const VSFrameRef * VS_CC getFrameGetFlow(int a_n, int a_activationReason,
-	void ** a_ppInstanceData, void ** a_ppFrameData,
-	VSFrameContext * a_pFrameCtx, VSCore * a_pCore, const VSAPI * a_cpVSAPI);
-
-void VS_CC freeGetFlow(void * a_pInstanceData, VSCore * a_pCore,
-	const VSAPI * a_cpVSAPI);
+InitVSNodeFun initGetFlow;
+GetFrameFun getFrameGetFlow;
+FreeVSNodeFun freeGetFlow;
 
 //==============================================================================
 
